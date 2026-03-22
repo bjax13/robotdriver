@@ -16,8 +16,32 @@ export function drawGrid(context, gridWidth, gridHeight, cellSize) {
   context.stroke();
 }
 
-export function drawRobot(context, x, y, size, direction) {
+const ROBOT_BODY_COLORS = [
+  "#1d4ed8",
+  "#15803d",
+  "#a16207",
+  "#7c3aed",
+  "#b91c1c",
+  "#0e7490",
+];
+
+const ROBOT_TIP_COLORS = [
+  "#fca5a5",
+  "#86efac",
+  "#fde047",
+  "#d8b4fe",
+  "#fecaca",
+  "#67e8f9",
+];
+
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {number} colorIndex - per-robot palette slot
+ */
+export function drawRobot(context, x, y, size, direction, colorIndex = 0) {
   const angle = (Math.PI / 180) * direction; // Convert degrees to radians
+  const bi = colorIndex % ROBOT_BODY_COLORS.length;
+  const ti = colorIndex % ROBOT_TIP_COLORS.length;
 
   // Calculate the vertices of the triangle
   const topX = x + size * Math.sin(angle);
@@ -33,7 +57,7 @@ export function drawRobot(context, x, y, size, direction) {
   context.lineTo(leftX, leftY);
   context.lineTo(x, y); // Center point
   context.closePath();
-  context.fillStyle = "blue"; // Main body color
+  context.fillStyle = ROBOT_BODY_COLORS[bi];
   context.fill();
 
   // Draw the tip of the robot
@@ -42,7 +66,7 @@ export function drawRobot(context, x, y, size, direction) {
   context.lineTo((rightX + x) / 2, (rightY + y) / 2); // Midpoint of right side
   context.lineTo((leftX + x) / 2, (leftY + y) / 2); // Midpoint of left side
   context.closePath();
-  context.fillStyle = "red"; // Tip color
+  context.fillStyle = ROBOT_TIP_COLORS[ti];
   context.fill();
 }
 
