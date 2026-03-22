@@ -86,6 +86,56 @@ export function drawWalls(context, walls) {
   });
 }
 
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, checkpoints?: { col: number, row: number }[] }} board
+ * @param {number} cellSize
+ */
+export function drawCheckpoints(context, board, cellSize) {
+  const cps = board.checkpoints;
+  if (!cps?.length) return;
+
+  const half = cellSize / 2;
+  const r = Math.max(4, cellSize * 0.2);
+
+  cps.forEach((cp, i) => {
+    const x = cp.col * cellSize + half;
+    const y = cp.row * cellSize + half;
+    context.beginPath();
+    context.arc(x, y, r, 0, Math.PI * 2);
+    context.fillStyle = "rgba(220, 38, 38, 0.35)";
+    context.fill();
+    context.strokeStyle = "#b91c1c";
+    context.lineWidth = 2;
+    context.stroke();
+    context.fillStyle = "#7f1d1d";
+    context.font = `bold ${Math.round(cellSize * 0.45)}px sans-serif`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(String(i + 1), x, y);
+  });
+}
+
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number }} board
+ * @param {number} cellSize
+ */
+export function drawStartSlotLabels(context, board, cellSize) {
+  const pad = 4;
+  context.fillStyle = "rgba(0,0,0,0.45)";
+  context.font = `bold ${Math.round(cellSize * 0.28)}px sans-serif`;
+  context.textAlign = "left";
+  context.textBaseline = "top";
+
+  for (let col = 0; col < board.width; col += 2) {
+    const slot = col / 2 + 1;
+    const x = col * cellSize + pad;
+    const y = pad;
+    context.fillText(String(slot), x, y);
+  }
+}
+
 export const checkCollisionWithWalls = (
   nextX,
   nextY,

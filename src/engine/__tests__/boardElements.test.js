@@ -91,4 +91,29 @@ describe('board elements', () => {
     expect(state.robots[0].nextCheckpoint).toBe(2);
     expect(state.winner).toBe('r1');
   });
+
+  it('three checkpoints in order sets winner when all visited', () => {
+    const board = createBoard(6, 5);
+    board.checkpoints = [
+      { col: 2, row: 2 },
+      { col: 3, row: 2 },
+      { col: 4, row: 2 },
+    ];
+    let state = createInitialState({
+      board,
+      robots: [{ col: 0, row: 2, direction: 90 }],
+      antenna: { col: 0, row: 0 },
+    });
+    state = dealHands(state);
+    state = setProgram(state, 'r1', [
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.MOVE1,
+    ]);
+    state = activateRound(state);
+    expect(state.robots[0].nextCheckpoint).toBe(3);
+    expect(state.winner).toBe('r1');
+  });
 });

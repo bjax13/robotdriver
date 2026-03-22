@@ -44,6 +44,7 @@
  * @property {string[]} [hand]
  * @property {(string|null)[]} [registers] - 5 slots, card type or null
  * @property {number} [energy]
+ * @property {number} [nextCheckpoint] - index of next board.checkpoints[] to complete (0-based)
  */
 
 /**

@@ -18,3 +18,6 @@ export { raycast } from './lasers.js';
 export { isPit } from './board.js';
 export { addDamage, rebootRobot, drawForSpam, SPAM_CARDS_PER_HIT } from './damage.js';
 export { loadCourse, DIZZY_HIGHWAY } from './courses.js';
+export { mulberry32 } from './random.js';
+export { getTopStartSlots, slotToCell } from './startLine.js';
+export { placeRandomCheckpoints, chooseInitialFacing } from './scenario.js';
