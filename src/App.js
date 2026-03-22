@@ -6,6 +6,7 @@ import {
   CELL_SIZE,
   HALF_CELL_SIZE,
   drawCheckpoints,
+  drawGears,
   drawGrid,
   drawRobot,
   drawLaserBeams,
@@ -61,12 +62,17 @@ const DEMO_BOARD_LASERS = [{ col: 9, row: 0, direction: 270 }];
 
 function buildDemoBoardAndRobots() {
   const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS, DEMO_BOARD_LASERS);
-  const excludeCells = new Set(["0,0", "2,0", "4,0"]);
+  const excludeCells = new Set(["0,0", "2,0", "4,0", "6,4", "7,4"]);
   const rand = mulberry32(DEMO_BOARD_SEED >>> 0);
   placeRandomCheckpoints(board, 3, rand, {
     excludeCells,
     excludeStartRow: true,
   });
+
+  board.gears = {
+    "6,4": "L",
+    "7,4": "R",
+  };
 
   const cp0 = board.checkpoints[0];
   const robotSpecs = [1, 2, 3].map((slotNum) => {
@@ -443,6 +449,7 @@ function App() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
+    drawGears(context, displayState.board, CELL_SIZE);
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     drawSpawnMarkers(context, displayState.robots, CELL_SIZE);

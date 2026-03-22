@@ -4,7 +4,7 @@ import { dealHands, setProgram, activateRound } from '../activation.js';
 import { CARD_TYPES } from '../cards.js';
 
 describe('board elements', () => {
-  it('robot on gear rotates', () => {
+  it('robot on right gear rotates clockwise each register', () => {
     const board = createBoard(5, 5);
     board.gears = { '2,2': 'R' };
     let state = createInitialState({
@@ -19,6 +19,28 @@ describe('board elements', () => {
       CARD_TYPES.TURN_RIGHT,
       CARD_TYPES.TURN_RIGHT,
       CARD_TYPES.TURN_RIGHT,
+    ]);
+    state = activateRound(state);
+    expect(state.robots[0].col).toBe(2);
+    expect(state.robots[0].row).toBe(2);
+    expect(state.robots[0].direction).toBe(180);
+  });
+
+  it('robot on left gear rotates counterclockwise each register', () => {
+    const board = createBoard(5, 5);
+    board.gears = { '2,2': 'L' };
+    let state = createInitialState({
+      board,
+      robots: [{ col: 2, row: 2, direction: 0 }],
+      antenna: { col: 0, row: 0 },
+    });
+    state = dealHands(state);
+    state = setProgram(state, 'r1', [
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
     ]);
     state = activateRound(state);
     expect(state.robots[0].col).toBe(2);
