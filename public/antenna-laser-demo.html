@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Robo Rally — priority antenna vs lasers (demo)</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+        color: #1e293b;
+      }
+      h1 {
+        font-size: 1.35rem;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        max-width: 640px;
+        height: auto;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+      .note {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-top: 0.75rem;
+      }
+      code {
+        background: #e2e8f0;
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        font-size: 0.88em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Priority antenna blocks laser line of sight</h1>
+    <p>
+      Red dashed lines match the app’s <code>traceLaserPath</code> geometry: the beam travels from the
+      shooter (triangle) cell center through each grid cell until it hits a robot, a wall, or the
+      <strong>antenna</strong> square when that square has no robot.
+    </p>
+    <canvas id="c" width="640" height="280" aria-label="Antenna laser demo diagram"></canvas>
+    <p class="note">
+      Open this page while the app is running: <code>http://localhost:3000/antenna-laser-demo.html</code>
+    </p>
+    <script>
+      const CS = 56;
+      const COLS = 10;
+      const ctx = document.getElementById("c").getContext("2d");
+
+      function cellCenter(col, row, ox, oy) {
+        return { x: ox + col * CS + CS / 2, y: oy + row * CS + CS / 2 };
+      }
+
+      function drawGrid(ox, oy, rows) {
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1;
+        for (let c = 0; c <= COLS; c++) {
+          ctx.beginPath();
+          ctx.moveTo(ox + c * CS, oy);
+          ctx.lineTo(ox + c * CS, oy + rows * CS);
+          ctx.stroke();
+        }
+        for (let r = 0; r <= rows; r++) {
+          ctx.beginPath();
+          ctx.moveTo(ox, oy + r * CS);
+          ctx.lineTo(ox + COLS * CS, oy + r * CS);
+          ctx.stroke();
+        }
+      }
+
+      function drawRobot(col, row, ox, oy, fill, facingEast) {
+        const { x, y } = cellCenter(col, row, ox, oy);
+        const R = CS * 0.32;
+        ctx.save();
+        ctx.translate(x, y);
+        if (facingEast) ctx.rotate(0);
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(R, 0);
+        ctx.lineTo(-R * 0.7, R * 0.65);
+        ctx.lineTo(-R * 0.7, -R * 0.65);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawAntenna(col, row, ox, oy) {
+        const { x, y } = cellCenter(col, row, ox, oy);
+        const s = CS * 0.22;
+        ctx.strokeStyle = "#0f172a";
+        ctx.fillStyle = "rgba(251, 191, 36, 0.35)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - s, y);
+        ctx.lineTo(x, y - s * 1.2);
+        ctx.lineTo(x + s, y);
+        ctx.lineTo(x, y + s * 1.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 11px system-ui,sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("A", x, y + CS * 0.42);
+      }
+
+      function drawBeam(ox, oy, fromCol, fromRow, pathCells) {
+        const start = cellCenter(fromCol, fromRow, ox, oy);
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.65)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 5]);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        for (const { col, row } of pathCells) {
+          const p = cellCenter(col, row, ox, oy);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      function label(text, ox, oy) {
+        ctx.fillStyle = "#334155";
+        ctx.font = "600 13px system-ui,sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(text, ox, oy - 6);
+      }
+
+      const ox = 24;
+      const y1 = 36;
+      const y2 = 164;
+
+      // Scenario 1: antenna at (5,0) empty — beam stops there; robot at (8,0) not hit
+      label("1. Empty antenna cell — beam stops (no hit behind)", ox, y1);
+      drawGrid(ox, y1, 1);
+      drawRobot(1, 0, ox, y1, "#3b82f6", true);
+      drawAntenna(5, 0, ox, y1);
+      drawRobot(8, 0, ox, y1, "#22c55e", true);
+      drawBeam(ox, y1, 1, 0, [
+        { col: 2, row: 0 },
+        { col: 3, row: 0 },
+        { col: 4, row: 0 },
+        { col: 5, row: 0 },
+      ]);
+
+      // Scenario 2: robot on antenna — robot is hit first (beam ends on that cell)
+      label("2. Robot on antenna — that robot is hit (beam does not pass through)", ox, y2);
+      drawGrid(ox, y2, 1);
+      drawRobot(1, 0, ox, y2, "#3b82f6", true);
+      drawAntenna(5, 0, ox, y2);
+      drawRobot(5, 0, ox, y2, "#a855f7", true);
+      drawRobot(8, 0, ox, y2, "#22c55e", true);
+      drawBeam(ox, y2, 1, 0, [
+        { col: 2, row: 0 },
+        { col: 3, row: 0 },
+        { col: 4, row: 0 },
+        { col: 5, row: 0 },
+      ]);
+    </script>
+  </body>
+</html>
