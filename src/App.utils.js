@@ -240,6 +240,57 @@ export function drawLaserBeams(context, board, robots, cellSize, antenna) {
   context.restore();
 }
 
+/**
+ * Visual origin for each wall-mounted laser: housing + wedge pointing along the beam direction.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ boardLasers?: { col: number, row: number, direction: number }[] }} board
+ * @param {number} cellSize
+ */
+export function drawBoardLaserEmitters(context, board, cellSize) {
+  const emitters = board.boardLasers;
+  if (!emitters?.length) return;
+
+  const housingR = Math.max(6, cellSize * 0.2);
+  const tipDist = housingR + Math.max(6, cellSize * 0.22);
+  const baseHalf = Math.max(3, cellSize * 0.12);
+  const back = housingR * 0.35;
+
+  for (const em of emitters) {
+    const { x, y } = toPixelCenter(em.col, em.row, cellSize);
+    const rad = (Math.PI / 180) * em.direction;
+    const fx = Math.sin(rad);
+    const fy = -Math.cos(rad);
+    const px = -fy;
+    const py = fx;
+
+    context.save();
+    context.lineJoin = "round";
+
+    context.beginPath();
+    context.arc(x, y, housingR, 0, Math.PI * 2);
+    context.fillStyle = "rgba(255, 247, 237, 0.95)";
+    context.fill();
+    context.strokeStyle = "#c2410c";
+    context.lineWidth = 2;
+    context.stroke();
+
+    const baseX = x - fx * back;
+    const baseY = y - fy * back;
+    context.beginPath();
+    context.moveTo(baseX + px * baseHalf, baseY + py * baseHalf);
+    context.lineTo(x + fx * tipDist, y + fy * tipDist);
+    context.lineTo(baseX - px * baseHalf, baseY - py * baseHalf);
+    context.closePath();
+    context.fillStyle = "#f97316";
+    context.fill();
+    context.strokeStyle = "#9a3412";
+    context.lineWidth = 1.5;
+    context.stroke();
+
+    context.restore();
+  }
+}
+
 export function drawStartSlotLabels(context, board, cellSize) {
   const pad = 4;
   context.fillStyle = "rgba(0,0,0,0.45)";
