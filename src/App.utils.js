@@ -183,8 +183,9 @@ export function drawSpawnMarkers(context, robots, cellSize) {
  * @param {{ width: number, height: number, walls: object }} board
  * @param {{ col: number, row: number, direction: number, id: string, rebooted?: boolean }[]} robots
  * @param {number} cellSize
+ * @param {{ col: number, row: number } | null | undefined} [antenna]
  */
-export function drawLaserBeams(context, board, robots, cellSize) {
+export function drawLaserBeams(context, board, robots, cellSize, antenna) {
   context.save();
   context.lineWidth = 3;
   context.lineCap = "round";
@@ -198,7 +199,8 @@ export function drawLaserBeams(context, board, robots, cellSize) {
       robot.col,
       robot.row,
       robot.direction,
-      robot.id
+      robot.id,
+      antenna
     );
     if (path.length === 0) continue;
     context.strokeStyle = "rgba(239, 68, 68, 0.55)";
@@ -221,7 +223,8 @@ export function drawLaserBeams(context, board, robots, cellSize) {
         em.col,
         em.row,
         em.direction,
-        undefined
+        undefined,
+        antenna
       );
       if (path.length === 0) continue;
       const start = toPixelCenter(em.col, em.row, cellSize);

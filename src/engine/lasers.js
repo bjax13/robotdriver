@@ -14,9 +14,10 @@ import { directionDelta } from './movement.js';
  * @param {number} row
  * @param {number} direction
  * @param {string} [excludeId] - shooter, don't hit self
+ * @param {{ col: number, row: number } | null | undefined} [antenna] - blocks beam after this cell if no robot there (robot on antenna square is hit first)
  * @returns {import('./types').Robot | null}
  */
-export function raycast(board, robots, col, row, direction, excludeId) {
+export function raycast(board, robots, col, row, direction, excludeId, antenna) {
   const { dCol, dRow } = directionDelta(direction);
   const cellToRobot = new Map();
   for (const r of robots) {
@@ -31,6 +32,7 @@ export function raycast(board, robots, col, row, direction, excludeId) {
     if (hasWall(board, c - dCol, r - dRow, direction)) break;
     const hit = cellToRobot.get(`${c},${r}`);
     if (hit) return hit;
+    if (antenna != null && antenna.col === c && antenna.row === r) return null;
     c += dCol;
     r += dRow;
   }
@@ -41,14 +43,15 @@ export function raycast(board, robots, col, row, direction, excludeId) {
  * Each non-rebooted robot fires forward; one entry per shooter that scores a hit.
  * @param {import('./types').Board} board
  * @param {import('./types').Robot[]} robots
+ * @param {{ col: number, row: number } | null | undefined} [antenna]
  * @returns {{ shooterId: string, targetId: string }[]}
  */
-export function listLaserHits(board, robots) {
+export function listLaserHits(board, robots, antenna) {
   const hits = [];
   for (const robot of robots) {
     if (robot.rebooted) continue;
     if (robot.powerDownThisRound) continue;
-    const hit = raycast(board, robots, robot.col, robot.row, robot.direction, robot.id);
+    const hit = raycast(board, robots, robot.col, robot.row, robot.direction, robot.id, antenna);
     if (hit) hits.push({ shooterId: robot.id, targetId: hit.id });
   }
   return hits;
@@ -68,14 +71,15 @@ export function boardLaserShooterId(col, row, direction) {
  * Wall-mounted beams: same geometry as a robot laser originating at (col,row) facing direction.
  * @param {import('./types').Board} board
  * @param {import('./types').Robot[]} robots
+ * @param {{ col: number, row: number } | null | undefined} [antenna]
  * @returns {{ shooterId: string, targetId: string }[]}
  */
-export function listBoardLaserHits(board, robots) {
+export function listBoardLaserHits(board, robots, antenna) {
   const emitters = board.boardLasers;
   if (!emitters?.length) return [];
   const hits = [];
   for (const em of emitters) {
-    const hit = raycast(board, robots, em.col, em.row, em.direction);
+    const hit = raycast(board, robots, em.col, em.row, em.direction, undefined, antenna);
     if (hit) {
       hits.push({
         shooterId: boardLaserShooterId(em.col, em.row, em.direction),
@@ -90,17 +94,19 @@ export function listBoardLaserHits(board, robots) {
  * Robot lasers then wall lasers (Robo Rally: factory beams in same laser step).
  * @param {import('./types').Board} board
  * @param {import('./types').Robot[]} robots
+ * @param {{ col: number, row: number } | null | undefined} [antenna]
  */
-export function listAllLaserHits(board, robots) {
-  return [...listLaserHits(board, robots), ...listBoardLaserHits(board, robots)];
+export function listAllLaserHits(board, robots, antenna) {
+  return [...listLaserHits(board, robots, antenna), ...listBoardLaserHits(board, robots, antenna)];
 }
 
 /**
  * Cell centers along the beam from (col,row) through the first hit or edge, for rendering.
  * Path excludes the shooter cell; includes the struck cell when a robot is hit.
+ * @param {{ col: number, row: number } | null | undefined} [antenna]
  * @returns {{ path: { col: number, row: number }[], hitRobotId: string | null }}
  */
-export function traceLaserPath(board, robots, col, row, direction, excludeId) {
+export function traceLaserPath(board, robots, col, row, direction, excludeId, antenna) {
   const { dCol, dRow } = directionDelta(direction);
   const cellToRobot = new Map();
   for (const r of robots) {
@@ -118,6 +124,7 @@ export function traceLaserPath(board, robots, col, row, direction, excludeId) {
     path.push({ col: c, row: r });
     const hit = cellToRobot.get(`${c},${r}`);
     if (hit) return { path, hitRobotId: hit.id };
+    if (antenna != null && antenna.col === c && antenna.row === r) return { path, hitRobotId: null };
     c += dCol;
     r += dRow;
   }

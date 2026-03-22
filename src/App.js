@@ -446,7 +446,7 @@ function App() {
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     drawSpawnMarkers(context, displayState.robots, CELL_SIZE);
-    drawLaserBeams(context, displayState.board, displayState.robots, CELL_SIZE);
+    drawLaserBeams(context, displayState.board, displayState.robots, CELL_SIZE, displayState.antenna);
     displayState.robots.forEach((robot, index) => {
       const { x, y } = toPixelCenter(robot.col, robot.row, CELL_SIZE);
       drawRobot(context, x, y, HALF_CELL_SIZE, robot.direction, index);
