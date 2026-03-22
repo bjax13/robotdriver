@@ -16,7 +16,7 @@ export function drawGrid(context, gridWidth, gridHeight, cellSize) {
   context.stroke();
 }
 
-const ROBOT_BODY_COLORS = [
+export const ROBOT_BODY_COLORS = [
   "#1d4ed8",
   "#15803d",
   "#a16207",
@@ -25,7 +25,7 @@ const ROBOT_BODY_COLORS = [
   "#0e7490",
 ];
 
-const ROBOT_TIP_COLORS = [
+export const ROBOT_TIP_COLORS = [
   "#fca5a5",
   "#86efac",
   "#fde047",
@@ -33,6 +33,32 @@ const ROBOT_TIP_COLORS = [
   "#fecaca",
   "#67e8f9",
 ];
+
+/** Short label for UI / event log (matches body color order). */
+export const ROBOT_COLOR_LABELS = [
+  "Blue",
+  "Green",
+  "Gold",
+  "Purple",
+  "Red",
+  "Teal",
+];
+
+/**
+ * Color index matches board drawing order (robots array index).
+ * @param {{ id: string }[]} robots
+ * @param {string} robotId
+ */
+export function getRobotColorIndex(robots, robotId) {
+  const i = robots.findIndex((r) => r.id === robotId);
+  return i < 0 ? 0 : i % ROBOT_BODY_COLORS.length;
+}
+
+export function getRobotDisplayLabel(robots, robotId) {
+  const idx = getRobotColorIndex(robots, robotId);
+  const color = ROBOT_COLOR_LABELS[idx];
+  return `${color} (${robotId})`;
+}
 
 /**
  * @param {CanvasRenderingContext2D} context
