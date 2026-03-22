@@ -6,7 +6,7 @@
 import { draw } from './deck.js';
 import { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
 import { isPit } from './board.js';
-import { listLaserHits } from './lasers.js';
+import { listAllLaserHits } from './lasers.js';
 import { addDamage, rebootRobot, drawForSpam, SPAM_CARDS_PER_HIT } from './damage.js';
 import { cardToAction, CARD_TYPES } from './cards.js';
 import { applyMove } from './gameState.js';
@@ -14,6 +14,46 @@ import { sortRobotsByPriority } from './priority.js';
 
 /** Max damage tokens (matches draw cap 9 − damage). */
 export const MAX_DAMAGE = 9;
+
+/**
+ * Autoplay: probability of choosing power down at damage d (d>=1).
+ * Base is very low at 1 damage; doubles with each additional damage token (capped at 1).
+ * @param {number} damage
+ * @returns {number} 0..1
+ */
+export function powerDownChance(damage) {
+  const d = Math.min(Math.max(damage ?? 0, 0), MAX_DAMAGE);
+  if (d <= 0) return 0;
+  const base = 1 / 128;
+  return Math.min(1, base * 2 ** (d - 1));
+}
+
+/**
+ * Skip this activation's program (all registers null), discard current hand; heal after register 5 completes.
+ * @param {import('./types').GameState} state
+ * @param {string} robotId
+ * @returns {import('./types').GameState}
+ */
+export function declarePowerDown(state, robotId) {
+  const robot = state.robots.find((r) => r.id === robotId);
+  if (!robot || robot.rebooted) return state;
+  if (robot.powerDownThisRound) return state;
+
+  const hand = robot.hand || [];
+  const toDiscard = [...hand];
+  const robots = state.robots.map((r) =>
+    r.id === robotId
+      ? {
+          ...r,
+          hand: [],
+          discard: [...(r.discard || []), ...toDiscard],
+          registers: [null, null, null, null, null],
+          powerDownThisRound: true,
+        }
+      : r
+  );
+  return { ...state, robots };
+}
 
 /**
  * Locked high registers (last N) keep last round's cards when damage > 0 and registers are full.
@@ -142,13 +182,20 @@ function getCardForRegister(registers, registerIndex) {
  */
 
 /**
+ * @typedef {Object} ActivationPowerDownHealEvent
+ * @property {'power_down_heal'} kind
+ * @property {number} registerIndex
+ * @property {string} robotId
+ */
+
+/**
  * Execute one register for all robots in priority order; returns state and audit events.
  * @param {import('./types').GameState} state
  * @param {number} registerIndex
- * @returns {{ state: import('./types').GameState, events: (ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent)[] }}
+ * @returns {{ state: import('./types').GameState, events: (ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent|ActivationPowerDownHealEvent)[] }}
  */
 export function activateRegisterWithEvents(state, registerIndex) {
-  /** @type {(ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent)[]} */
+  /** @type {(ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent|ActivationPowerDownHealEvent)[]} */
   const events = [];
   if (!state.antenna) return { state, events };
 
@@ -215,6 +262,30 @@ export function activateRegisterWithEvents(state, registerIndex) {
     registerIndex,
     details: 'conveyors, gears, push panels, pits, checkpoints',
   });
+
+  if (registerIndex === 4) {
+    const healedIds = [];
+    const robots = s.robots.map((r) => {
+      if (!r.powerDownThisRound) return r;
+      healedIds.push(r.id);
+      return {
+        ...r,
+        damage: 0,
+        powerDownThisRound: false,
+        registers: [],
+      };
+    });
+    if (healedIds.length > 0) {
+      s = { ...s, robots };
+      for (const robotId of healedIds) {
+        events.push({
+          kind: 'power_down_heal',
+          registerIndex,
+          robotId,
+        });
+      }
+    }
+  }
 
   return { state: s, events };
 }
@@ -298,7 +369,7 @@ function applyPits(state) {
  * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
  */
 function applyRobotLasers(state) {
-  const laserHits = listLaserHits(state.board, state.robots);
+  const laserHits = listAllLaserHits(state.board, state.robots);
   if (laserHits.length === 0) return { state, laserHits: [] };
   const damaged = new Map();
   for (const h of laserHits) {

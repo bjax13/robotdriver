@@ -1,5 +1,12 @@
 import { createBoard } from '../board.js';
-import { raycast, traceLaserPath, listLaserHits } from '../lasers.js';
+import {
+  raycast,
+  traceLaserPath,
+  listLaserHits,
+  listBoardLaserHits,
+  listAllLaserHits,
+  boardLaserShooterId,
+} from '../lasers.js';
 
 describe('raycast walls', () => {
   it('does not hit robot behind a wall', () => {
@@ -60,5 +67,49 @@ describe('listLaserHits', () => {
     ];
     const hits = listLaserHits(board, robots);
     expect(hits).toEqual([{ shooterId: 'r1', targetId: 'r2' }]);
+  });
+});
+
+describe('listBoardLaserHits', () => {
+  it('hits first robot in beam from emitter cell', () => {
+    const board = createBoard(6, 3, [], [{ col: 5, row: 1, direction: 270 }]);
+    const robots = [
+      { id: 'r1', col: 2, row: 1, direction: 0 },
+      { id: 'r2', col: 4, row: 1, direction: 0 },
+    ];
+    const hits = listBoardLaserHits(board, robots);
+    expect(hits).toEqual([
+      {
+        shooterId: boardLaserShooterId(5, 1, 270),
+        targetId: 'r2',
+      },
+    ]);
+  });
+
+  it('returns empty when a wall blocks the beam', () => {
+    const board = createBoard(6, 3, [{ col: 4, row: 1, edge: 'E' }], [
+      { col: 5, row: 1, direction: 270 },
+    ]);
+    const robots = [
+      { id: 'r1', col: 2, row: 1, direction: 0 },
+      { id: 'r2', col: 3, row: 1, direction: 0 },
+    ];
+    expect(listBoardLaserHits(board, robots)).toEqual([]);
+  });
+});
+
+describe('listAllLaserHits', () => {
+  it('includes robot beams then board beams', () => {
+    const board = createBoard(8, 3, [], [{ col: 7, row: 1, direction: 270 }]);
+    const robots = [
+      { id: 'r1', col: 1, row: 1, direction: 90 },
+      { id: 'r2', col: 3, row: 1, direction: 0 },
+      { id: 'r3', col: 5, row: 1, direction: 0 },
+    ];
+    const hits = listAllLaserHits(board, robots);
+    expect(hits).toEqual([
+      { shooterId: 'r1', targetId: 'r2' },
+      { shooterId: boardLaserShooterId(7, 1, 270), targetId: 'r3' },
+    ]);
   });
 });

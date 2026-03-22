@@ -186,12 +186,12 @@ export function drawSpawnMarkers(context, robots, cellSize) {
  */
 export function drawLaserBeams(context, board, robots, cellSize) {
   context.save();
-  context.strokeStyle = "rgba(239, 68, 68, 0.55)";
   context.lineWidth = 3;
   context.lineCap = "round";
   context.setLineDash([4, 4]);
   for (const robot of robots) {
     if (robot.rebooted) continue;
+    if (robot.powerDownThisRound) continue;
     const { path } = traceLaserPath(
       board,
       robots,
@@ -201,6 +201,7 @@ export function drawLaserBeams(context, board, robots, cellSize) {
       robot.id
     );
     if (path.length === 0) continue;
+    context.strokeStyle = "rgba(239, 68, 68, 0.55)";
     const start = toPixelCenter(robot.col, robot.row, cellSize);
     context.beginPath();
     context.moveTo(start.x, start.y);
@@ -209,6 +210,29 @@ export function drawLaserBeams(context, board, robots, cellSize) {
       context.lineTo(p.x, p.y);
     }
     context.stroke();
+  }
+  const emitters = board.boardLasers;
+  if (emitters?.length) {
+    context.strokeStyle = "rgba(249, 115, 22, 0.65)";
+    for (const em of emitters) {
+      const { path } = traceLaserPath(
+        board,
+        robots,
+        em.col,
+        em.row,
+        em.direction,
+        undefined
+      );
+      if (path.length === 0) continue;
+      const start = toPixelCenter(em.col, em.row, cellSize);
+      context.beginPath();
+      context.moveTo(start.x, start.y);
+      for (const cell of path) {
+        const p = toPixelCenter(cell.col, cell.row, cellSize);
+        context.lineTo(p.x, p.y);
+      }
+      context.stroke();
+    }
   }
   context.restore();
 }

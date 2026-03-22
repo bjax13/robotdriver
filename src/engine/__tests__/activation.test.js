@@ -129,6 +129,29 @@ describe('activation', () => {
     expect(events[events.length - 1].kind).toBe('board_resolve');
   });
 
+  it('activateRegisterWithEvents emits laser_hit for wall-mounted laser', () => {
+    let state = createInitialState({
+      board: createBoard(6, 3, [], [{ col: 5, row: 1, direction: 270 }]),
+      robots: [
+        { col: 2, row: 1, direction: 0 },
+        { col: 4, row: 1, direction: 0 },
+      ],
+      antenna: { col: 0, row: 0 },
+    });
+    const five = Array(5).fill(CARD_TYPES.POWER_UP);
+    state = {
+      ...state,
+      robots: state.robots.map((r) => ({ ...r, registers: five, hand: [] })),
+    };
+    const { events } = activateRegisterWithEvents(state, 0);
+    const laserEvents = events.filter((e) => e.kind === 'laser_hit');
+    expect(
+      laserEvents.some(
+        (e) => e.shooterId.startsWith('wall:') && e.targetId === 'r2'
+      )
+    ).toBe(true);
+  });
+
   it('Again repeats previous register', () => {
     let state = createInitialState({
       robots: [{ col: 5, row: 2 }],

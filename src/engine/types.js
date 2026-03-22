@@ -30,6 +30,8 @@
  * @property {{ col: number, row: number }[]} [checkpoints]
  * @property {number} [rebootCol]
  * @property {number} [rebootRow]
+ * @property {{ col: number, row: number, direction: number }[]} [boardLasers]
+ *   Wall-mounted emitters; same direction scheme as robots (0=N,90=E,180=S,270=W). Beam uses same raycast as robot lasers.
  */
 
 /**
@@ -48,6 +50,7 @@
  * @property {number} [spawnCol] - archive / reboot column (defaults to start; updates on checkpoint)
  * @property {number} [spawnRow]
  * @property {number} [damage] - damage tokens (smaller hand; locks high registers)
+ * @property {boolean} [powerDownThisRound] - skip program execution this activation; heal to 0 damage after register 5
  */
 
 /**
