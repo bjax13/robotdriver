@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import "./App.css";
 import {
   CANVAS_HEIGHT,
@@ -11,6 +11,8 @@ import {
   drawSpawnMarkers,
   drawStartSlotLabels,
   drawWalls,
+  getRobotColorIndex,
+  getRobotDisplayLabel,
 } from "./App.utils";
 import {
   createBoard,
@@ -95,6 +97,49 @@ const CARD_LABELS = {
   [CARD_TYPES.POWER_UP]: "Power",
   [CARD_TYPES.AGAIN]: "Again",
 };
+
+const ACTION_LABELS = {
+  move1: "Move 1",
+  move2: "Move 2",
+  move3: "Move 3",
+  turnLeft: "Turn left",
+  turnRight: "Turn right",
+  uturn: "U-turn",
+  back: "Back up",
+  powerUp: "Power up",
+};
+
+/**
+ * Same triangle rendering as the board, for labels and the event log.
+ * @param {{ colorIndex: number, size?: number }} props
+ */
+function RobotSwatch({ colorIndex, size = 26 }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    const c = size / 2;
+    const half = size * 0.38;
+    drawRobot(ctx, c, c, half, 0, colorIndex);
+  }, [colorIndex, size]);
+  return (
+    <canvas
+      ref={ref}
+      width={size}
+      height={size}
+      aria-hidden
+      style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}
+    />
+  );
+}
 
 function gameReducer(state, action) {
   switch (action.type) {
@@ -432,8 +477,26 @@ function App() {
                   {entry.kind === "robot_action" && (
                     <>
                       {" "}
-                      · P{entry.priorityInRegister} · {entry.robotId} ·{" "}
-                      {CARD_LABELS[entry.card] || entry.card} → {entry.action}
+                      · P{entry.priorityInRegister} ·{" "}
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        <RobotSwatch
+                          colorIndex={getRobotColorIndex(gameState.robots, entry.robotId)}
+                          size={22}
+                        />
+                        <span style={{ fontWeight: 600 }}>
+                          {getRobotDisplayLabel(gameState.robots, entry.robotId)}
+                        </span>
+                      </span>
+                      {" "}
+                      · {CARD_LABELS[entry.card] || entry.card} →{" "}
+                      {ACTION_LABELS[entry.action] || entry.action}
                     </>
                   )}
                   {entry.kind === "board_resolve" && (
@@ -445,7 +508,14 @@ function App() {
           </div>
         </div>
         {displayState.winner && (
-          <p data-testid="winner">Winner: {displayState.winner}</p>
+          <p data-testid="winner" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span>Winner:</span>
+            <RobotSwatch
+              colorIndex={getRobotColorIndex(gameState.robots, displayState.winner)}
+              size={28}
+            />
+            <span>{getRobotDisplayLabel(gameState.robots, displayState.winner)}</span>
+          </p>
         )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
           <span>Robot:</span>
@@ -456,8 +526,12 @@ function App() {
               onClick={() => setSelectedRobotId(r.id)}
               style={{
                 fontWeight: selectedRobotId === r.id ? "bold" : "normal",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
+              <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={24} />
               {r.id}
             </button>
           ))}
