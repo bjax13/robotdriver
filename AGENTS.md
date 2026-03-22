@@ -7,7 +7,7 @@ This is **RobotDriver**, a client-side Robo Rally board game built with Create R
 ### Running the app
 
 - `npm start` — dev server on port 3000 with hot reload
-- `npm test` — Jest tests (84 tests across 18 suites); use `CI=true npm test` for non-interactive mode
+- `npm test` — Jest tests (88 tests across 18 suites); use `CI=true npm test` for non-interactive mode
 - `npm run build` — production build
 - `npx eslint src/` — lint (0 errors, 7 pre-existing warnings)
 
