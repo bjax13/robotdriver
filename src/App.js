@@ -193,8 +193,11 @@ function hashStringToSeed(s) {
   return h >>> 0;
 }
 
+const EMPTY_EVENT_LOG = [];
+
 function App() {
   const canvasRef = useRef(null);
+  const eventLogRef = useRef(null);
   const [gameState, dispatch] = useReducer(gameReducer, initialState);
   const [selectedRobotId, setSelectedRobotId] = useState("r1");
   const [programDrafts, setProgramDrafts] = useState({});
@@ -474,7 +477,14 @@ function App() {
     clearActivationSession();
   };
 
-  const log = activationSession?.log ?? [];
+  const log = activationSession?.log ?? EMPTY_EVENT_LOG;
+  const lastLogOrder = log.length > 0 ? log[log.length - 1].globalOrder : -1;
+
+  useLayoutEffect(() => {
+    const el = eventLogRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [log.length, lastLogOrder]);
 
   return (
     <div className="App">
@@ -482,6 +492,7 @@ function App() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
           <canvas ref={canvasRef} />
           <div
+            ref={eventLogRef}
             style={{
               minWidth: 280,
               maxWidth: 420,
