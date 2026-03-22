@@ -369,7 +369,7 @@ function applyPits(state) {
  * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
  */
 function applyRobotLasers(state) {
-  const laserHits = listAllLaserHits(state.board, state.robots);
+  const laserHits = listAllLaserHits(state.board, state.robots, state.antenna);
   if (laserHits.length === 0) return { state, laserHits: [] };
   const damaged = new Map();
   for (const h of laserHits) {

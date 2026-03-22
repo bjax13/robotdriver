@@ -8,6 +8,28 @@ import {
   boardLaserShooterId,
 } from '../lasers.js';
 
+describe('raycast antenna', () => {
+  it('does not hit robot behind priority antenna (empty antenna cell blocks)', () => {
+    const board = createBoard(8, 3);
+    const antenna = { col: 3, row: 1 };
+    const robots = [
+      { id: 'r1', col: 1, row: 1, direction: 90 },
+      { id: 'r2', col: 5, row: 1, direction: 0 },
+    ];
+    expect(raycast(board, robots, 1, 1, 90, 'r1', antenna)).toBeNull();
+  });
+
+  it('still hits robot standing on antenna square', () => {
+    const board = createBoard(8, 3);
+    const antenna = { col: 3, row: 1 };
+    const robots = [
+      { id: 'r1', col: 1, row: 1, direction: 90 },
+      { id: 'r2', col: 3, row: 1, direction: 0 },
+    ];
+    expect(raycast(board, robots, 1, 1, 90, 'r1', antenna)?.id).toBe('r2');
+  });
+});
+
 describe('raycast walls', () => {
   it('does not hit robot behind a wall', () => {
     const board = createBoard(6, 3, [
@@ -55,6 +77,19 @@ describe('traceLaserPath', () => {
     const { path, hitRobotId } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
     expect(hitRobotId).toBeNull();
     expect(path).toEqual([]);
+  });
+
+  it('path ends on antenna cell when beam is blocked there', () => {
+    const board = createBoard(6, 3);
+    const antenna = { col: 3, row: 1 };
+    const robots = [
+      { id: 'r1', col: 1, row: 1, direction: 90 },
+      { id: 'r2', col: 5, row: 1, direction: 0 },
+    ];
+    expect(raycast(board, robots, 1, 1, 90, 'r1', antenna)).toBeNull();
+    const { path, hitRobotId } = traceLaserPath(board, robots, 1, 1, 90, 'r1', antenna);
+    expect(hitRobotId).toBeNull();
+    expect(path).toEqual([{ col: 2, row: 1 }, { col: 3, row: 1 }]);
   });
 });
 
@@ -111,5 +146,15 @@ describe('listAllLaserHits', () => {
       { shooterId: 'r1', targetId: 'r2' },
       { shooterId: boardLaserShooterId(7, 1, 270), targetId: 'r3' },
     ]);
+  });
+
+  it('omits hits blocked by antenna between shooter and target', () => {
+    const board = createBoard(8, 3);
+    const antenna = { col: 3, row: 1 };
+    const robots = [
+      { id: 'r1', col: 1, row: 1, direction: 90 },
+      { id: 'r2', col: 5, row: 1, direction: 0 },
+    ];
+    expect(listAllLaserHits(board, robots, antenna)).toEqual([]);
   });
 });
