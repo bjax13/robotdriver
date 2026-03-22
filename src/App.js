@@ -8,6 +8,7 @@ import {
   drawCheckpoints,
   drawGrid,
   drawRobot,
+  drawSpawnMarkers,
   drawStartSlotLabels,
   drawWalls,
 } from "./App.utils";
@@ -26,6 +27,9 @@ import {
   placeRandomCheckpoints,
   chooseInitialFacing,
   slotToCell,
+  pickProgram,
+  getUnlockedRegisterCount,
+  getHandDrawCount,
 } from "./engine";
 
 const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
@@ -77,6 +81,7 @@ const initialState = createInitialState({
   board: initialBoard,
   robots: initialRobotSpecs,
   antenna: { col: 5, row: 5 },
+  robotDeckSeedBase: 0xc0ffee,
 });
 
 const CARD_LABELS = {
@@ -114,15 +119,6 @@ function hashStringToSeed(s) {
     h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   }
   return h >>> 0;
-}
-
-function shuffleCopy(arr, rand) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 function App() {
@@ -286,6 +282,7 @@ function App() {
     drawWalls(context, walls);
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
+    drawSpawnMarkers(context, displayState.robots, CELL_SIZE);
     displayState.robots.forEach((robot, index) => {
       const { x, y } = toPixelCenter(robot.col, robot.row, CELL_SIZE);
       drawRobot(context, x, y, HALF_CELL_SIZE, robot.direction, index);
@@ -320,10 +317,29 @@ function App() {
 
   const selectedRobot = gameState.robots.find((r) => r.id === selectedRobotId);
   const hand = selectedRobot?.hand || [];
-  const canProgram = hand.length >= 5 && program.length === 5;
+  const unlockedSlots = selectedRobot ? getUnlockedRegisterCount(selectedRobot) : 0;
+  const handDrawCount = selectedRobot ? getHandDrawCount(selectedRobot) : 9;
+  const lockedRegs = selectedRobot?.registers ?? [];
+  const lockedCount = 5 - unlockedSlots;
+
+  const canProgram =
+    !!selectedRobot &&
+    !selectedRobot.rebooted &&
+    ((lockedRegs.length === 5 && unlockedSlots === 0 && program.length === 0) ||
+      (unlockedSlots > 0 &&
+        hand.length >= unlockedSlots &&
+        program.length === unlockedSlots));
+
+  useEffect(() => {
+    setProgramDrafts((d) => {
+      const cur = d[selectedRobotId] ?? [];
+      if (cur.length <= unlockedSlots) return d;
+      return { ...d, [selectedRobotId]: cur.slice(0, unlockedSlots) };
+    });
+  }, [selectedRobotId, unlockedSlots]);
 
   const addToProgram = (card) => {
-    if (program.length >= 5) return;
+    if (program.length >= unlockedSlots) return;
     const inHand = hand.filter((c) => c === card).length;
     const inProgram = program.filter((c) => c === card).length;
     if (inProgram < inHand) setProgramForSelected([...program, card]);
@@ -359,10 +375,18 @@ function App() {
     let next = gameState;
     for (const r of gameState.robots) {
       if (r.rebooted) continue;
+      const need = getUnlockedRegisterCount(r);
       const h = r.hand || [];
-      if (h.length < 5) continue;
-      const five = shuffleCopy(h, rand).slice(0, 5);
-      next = setProgram(next, r.id, five);
+      if (need === 0) {
+        if ((r.registers?.length ?? 0) === 5) {
+          next = setProgram(next, r.id, []);
+        }
+        continue;
+      }
+      if (h.length < need) continue;
+      const picks = pickProgram(next, r.id, rand);
+      if (picks.length !== need) continue;
+      next = setProgram(next, r.id, picks);
     }
     dispatch({ type: "MERGE_STATE", payload: next });
     setProgramDrafts({});
@@ -512,7 +536,14 @@ function App() {
           <button
             type="button"
             onClick={onAutoplayPrograms}
-            disabled={!gameState.robots.some((r) => (r.hand?.length ?? 0) >= 5)}
+            disabled={
+              !gameState.robots.some((r) => {
+                if (r.rebooted) return false;
+                const u = getUnlockedRegisterCount(r);
+                if (u === 0) return (r.registers?.length ?? 0) === 5;
+                return (r.hand?.length ?? 0) >= u;
+              })
+            }
           >
             Autoplay programs (all robots with hands)
           </button>
@@ -525,12 +556,25 @@ function App() {
           </p>
         )}
         <div style={{ padding: 8 }}>
-          <span style={{ marginRight: 8 }}>Registers ({selectedRobotId}):</span>
+          <span style={{ marginRight: 8 }}>
+            Registers ({selectedRobotId}) — damage {selectedRobot?.damage ?? 0}, draw {handDrawCount},{" "}
+            {unlockedSlots} unlocked:
+          </span>
           {program.map((c, i) => (
             <button key={i} type="button" onClick={() => removeFromProgram(i)}>
               {CARD_LABELS[c] || c}
             </button>
           ))}
+          {lockedCount > 0 && lockedRegs.length === 5 && (
+            <span style={{ marginLeft: 8, color: "#64748b" }}>
+              Locked:{" "}
+              {lockedRegs.slice(unlockedSlots).map((c, i) => (
+                <span key={`L${i}`} style={{ marginLeft: 4 }}>
+                  {CARD_LABELS[c] || c}
+                </span>
+              ))}
+            </span>
+          )}
         </div>
         <div style={{ padding: 8 }}>
           <span style={{ marginRight: 8 }}>Hand ({selectedRobotId}):</span>

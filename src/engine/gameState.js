@@ -5,7 +5,14 @@
 
 import { createBoard } from './board.js';
 import { createDeck } from './deck.js';
-import { stepForward, stepBackward, stepForwardWithPush, turn } from './movement.js';
+import {
+  stepForward,
+  stepBackward,
+  stepForwardWithPush,
+  turn,
+  forwardMoveWouldEnterOccupied,
+  backwardMoveWouldEnterOccupied,
+} from './movement.js';
 
 /**
  * Build set of occupied cells from robots, excluding given robotId.
@@ -37,7 +44,9 @@ export function applyMove(state, robotId, action) {
   if (action === 'move1' || action === 'move2' || action === 'move3') {
     const steps = parseInt(action.replace('move', ''), 10);
     const hasOthers = activeRobots.some((r) => r.id !== robotId);
-    if (hasOthers) {
+    const needsPush =
+      hasOthers && forwardMoveWouldEnterOccupied(state.board, robot, occupied, steps);
+    if (needsPush) {
       const { updates } = stepForwardWithPush(state.board, robot, activeRobots, steps);
       const robots = state.robots.map((r) => {
         const u = updates.get(r.id);
@@ -53,7 +62,8 @@ export function applyMove(state, robotId, action) {
     next = stepForward(state.board, robot, occupied, steps);
   } else if (action === 'back') {
     const hasOthers = activeRobots.some((r) => r.id !== robotId);
-    if (hasOthers) {
+    const backNeedsPush = hasOthers && backwardMoveWouldEnterOccupied(state.board, robot, occupied);
+    if (backNeedsPush) {
       const oppositeDir = (robot.direction + 180) % 360;
       const virtual = { ...robot, direction: oppositeDir };
       const { updates } = stepForwardWithPush(state.board, virtual, activeRobots, 1);
@@ -87,7 +97,8 @@ export function applyMove(state, robotId, action) {
  * @param {number} [options.width=10]
  * @param {number} [options.height=10]
  * @param {{ col: number, row: number }} [options.antenna]
- * @param {{ col: number, row: number, direction?: number }[]} [options.robots]
+ * @param {{ col: number, row: number, direction?: number, damage?: number }[]} [options.robots]
+ * @param {number} [options.robotDeckSeedBase] - if set, each robot deck uses createDeck(base + index)
  * @returns {import('./types').GameState}
  */
 export function createInitialState(options = {}) {
@@ -103,7 +114,13 @@ export function createInitialState(options = {}) {
     row: spec.row,
     direction: spec.direction ?? 90,
     nextCheckpoint: 0,
-    deck: createDeck(),
+    spawnCol: spec.col,
+    spawnRow: spec.row,
+    damage: spec.damage ?? 0,
+    deck:
+      options.robotDeckSeedBase !== undefined
+        ? createDeck(options.robotDeckSeedBase + i)
+        : createDeck(),
     discard: [],
     hand: [],
     registers: [],

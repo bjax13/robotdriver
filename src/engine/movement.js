@@ -47,6 +47,42 @@ function cellToRobotMapWithUpdates(robots, updates) {
  * @param {number} steps - 1, 2, or 3
  * @returns {{ updates: Map<string, { col: number, row: number, direction: number }> }}
  */
+/**
+ * True if a naive forward walk (no pushing) would enter another robot's cell.
+ * Used to choose push vs non-push resolution in applyMove.
+ * @param {import('./types').Board} board
+ * @param {import('./types').Robot} robot
+ * @param {Set<string>} occupiedOthers - "col,row" keys for other robots
+ * @param {number} steps
+ * @returns {boolean}
+ */
+export function forwardMoveWouldEnterOccupied(board, robot, occupiedOthers, steps) {
+  let { col, row, direction } = robot;
+  const { dCol, dRow } = directionDelta(direction);
+  for (let i = 0; i < steps; i++) {
+    if (hasWall(board, col, row, direction)) break;
+    const nc = col + dCol;
+    const nr = row + dRow;
+    if (!inBounds(board, nc, nr)) break;
+    if (occupiedOthers.has(`${nc},${nr}`)) return true;
+    col = nc;
+    row = nr;
+  }
+  return false;
+}
+
+/**
+ * @param {import('./types').Board} board
+ * @param {import('./types').Robot} robot
+ * @param {Set<string>} occupiedOthers
+ * @returns {boolean}
+ */
+export function backwardMoveWouldEnterOccupied(board, robot, occupiedOthers) {
+  const virtualDir = (robot.direction + 180) % 360;
+  const virtual = { ...robot, direction: virtualDir };
+  return forwardMoveWouldEnterOccupied(board, virtual, occupiedOthers, 1);
+}
+
 export function stepForwardWithPush(board, robot, allRobots, steps) {
   const updates = new Map();
   let col = robot.col;

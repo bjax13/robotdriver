@@ -12,35 +12,77 @@ import { cardToAction, CARD_TYPES } from './cards.js';
 import { applyMove } from './gameState.js';
 import { sortRobotsByPriority } from './priority.js';
 
+const MAX_DAMAGE = 9;
+
 /**
- * Deal 9 cards to each robot's hand. Shuffle discard into deck if needed.
+ * Locked high registers (last N) keep last round's cards when damage > 0 and registers are full.
+ * @param {import('./types').Robot} robot
+ * @returns {number} 0–5
+ */
+export function getLockedRegisterCount(robot) {
+  if ((robot.registers?.length ?? 0) !== 5) return 0;
+  const d = Math.min(robot.damage ?? 0, MAX_DAMAGE);
+  return Math.min(d, 5);
+}
+
+/**
+ * @param {import('./types').Robot} robot
+ * @returns {number}
+ */
+export function getUnlockedRegisterCount(robot) {
+  return 5 - getLockedRegisterCount(robot);
+}
+
+/**
+ * Cards drawn this programming phase: 9 minus damage (min 0).
+ * @param {import('./types').Robot} robot
+ * @returns {number}
+ */
+export function getHandDrawCount(robot) {
+  const d = Math.min(robot.damage ?? 0, MAX_DAMAGE);
+  return Math.max(0, 9 - d);
+}
+
+/**
+ * Deal cards to each robot's hand (count from damage). Does not clear registers.
  * @param {import('./types').GameState} state
  * @returns {import('./types').GameState}
  */
 export function dealHands(state) {
   const robots = state.robots.map((r) => {
     if (r.rebooted) return r;
-    const { deck, discard, drawn } = draw(r.deck || [], r.discard || [], 9);
+    const n = getHandDrawCount(r);
+    const { deck, discard, drawn } = draw(r.deck || [], r.discard || [], n);
     return { ...r, deck, discard, hand: drawn };
   });
   return { ...state, robots };
 }
 
 /**
- * Place five cards into registers. Selected cards removed from hand; rest go to discard.
+ * Place picked cards into unlocked registers; locked slots keep previous register cards.
  * @param {import('./types').GameState} state
  * @param {string} robotId
- * @param {string[]} fiveCards - card types for registers 0-4 (must be in hand)
+ * @param {string[]} pickedCards - length must equal getUnlockedRegisterCount(robot)
  * @returns {import('./types').GameState}
  */
-export function setProgram(state, robotId, fiveCards) {
-  if (fiveCards.length !== 5) return state;
+export function setProgram(state, robotId, pickedCards) {
   const robot = state.robots.find((r) => r.id === robotId);
   if (!robot) return state;
 
+  const locked = getLockedRegisterCount(robot);
+  const unlocked = 5 - locked;
+  if (pickedCards.length !== unlocked) return state;
+
+  const regs = robot.registers || [];
+  const merged = [];
+  for (let i = 0; i < 5; i++) {
+    if (i < unlocked) merged[i] = pickedCards[i];
+    else merged[i] = regs[i];
+  }
+
   const hand = [...(robot.hand || [])];
   const toDiscard = [];
-  for (const card of fiveCards) {
+  for (const card of pickedCards) {
     const idx = hand.indexOf(card);
     if (idx >= 0) hand.splice(idx, 1);
   }
@@ -52,7 +94,7 @@ export function setProgram(state, robotId, fiveCards) {
       ...r,
       hand: [],
       discard: [...(r.discard || []), ...toDiscard],
-      registers: [...fiveCards],
+      registers: merged,
     };
   });
   return { ...state, robots };
@@ -218,12 +260,14 @@ function resolveBoardElements(state, registerIndex) {
 
 function applyPits(state) {
   if (!state.board.pits) return state;
-  const rebootCol = state.board.rebootCol ?? 0;
-  const rebootRow = state.board.rebootRow ?? 0;
+  const fallbackCol = state.board.rebootCol ?? 0;
+  const fallbackRow = state.board.rebootRow ?? 0;
   const robots = state.robots.map((r) => {
     if (r.rebooted) return r;
     if (!isPit(state.board, r.col, r.row)) return r;
-    return rebootRobot(r, rebootCol, rebootRow, 1);
+    const rc = r.spawnCol ?? fallbackCol;
+    const rr = r.spawnRow ?? fallbackRow;
+    return rebootRobot(r, rc, rr, 1);
   });
   return { ...state, robots };
 }
@@ -238,7 +282,9 @@ function applyRobotLasers(state) {
   if (damaged.size === 0) return state;
   const robots = state.robots.map((r) => {
     const count = damaged.get(r.id);
-    return count ? addDamage(r, count * SPAM_CARDS_PER_HIT) : r;
+    if (!count) return r;
+    const nextDamage = Math.min(MAX_DAMAGE, (r.damage ?? 0) + count);
+    return addDamage({ ...r, damage: nextDamage }, count * SPAM_CARDS_PER_HIT);
   });
   return { ...state, robots };
 }
@@ -251,7 +297,12 @@ function applyCheckpoints(state) {
     const cp = state.board.checkpoints[nextCp];
     if (!cp) return r;
     if (r.col === cp.col && r.row === cp.row) {
-      return { ...r, nextCheckpoint: nextCp + 1 };
+      return {
+        ...r,
+        nextCheckpoint: nextCp + 1,
+        spawnCol: cp.col,
+        spawnRow: cp.row,
+      };
     }
     return r;
   });

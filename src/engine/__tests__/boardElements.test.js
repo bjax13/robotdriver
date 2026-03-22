@@ -45,8 +45,8 @@ describe('board elements', () => {
       CARD_TYPES.MOVE1,
     ]);
     state = activateRound(state);
-    expect(state.robots[0].col).toBe(0);
-    expect(state.robots[0].row).toBe(0);
+    expect(state.robots[0].col).toBe(2);
+    expect(state.robots[0].row).toBe(2);
     expect(state.robots[0].registers).toEqual([]);
   });
 

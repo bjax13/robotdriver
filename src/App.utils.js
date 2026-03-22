@@ -121,6 +121,33 @@ export function drawCheckpoints(context, board, cellSize) {
  * @param {{ width: number }} board
  * @param {number} cellSize
  */
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ spawnCol?: number, spawnRow?: number, rebooted?: boolean }[]} robots
+ * @param {number} cellSize
+ */
+export function drawSpawnMarkers(context, robots, cellSize) {
+  const half = cellSize / 2;
+  const s = Math.max(3, cellSize * 0.12);
+  context.strokeStyle = "#0369a1";
+  context.lineWidth = 2;
+  for (const r of robots) {
+    if (r.rebooted) continue;
+    const sc = r.spawnCol;
+    const sr = r.spawnRow;
+    if (sc === undefined || sr === undefined) continue;
+    const x = sc * cellSize + half;
+    const y = sr * cellSize + half;
+    context.beginPath();
+    context.moveTo(x - s, y);
+    context.lineTo(x, y - s);
+    context.lineTo(x + s, y);
+    context.lineTo(x, y + s);
+    context.closePath();
+    context.stroke();
+  }
+}
+
 export function drawStartSlotLabels(context, board, cellSize) {
   const pad = 4;
   context.fillStyle = "rgba(0,0,0,0.45)";
