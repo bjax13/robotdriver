@@ -5,6 +5,7 @@ import {
   activateRound,
   activateRegister,
   activateRegisterWithEvents,
+  getHandDrawCount,
 } from '../activation.js';
 import { CARD_TYPES } from '../cards.js';
 
@@ -14,6 +15,30 @@ describe('activation', () => {
     const after = dealHands(state);
     expect(after.robots[0].hand).toHaveLength(9);
     expect(after.robots[0].deck.length).toBeLessThan(state.robots[0].deck.length);
+  });
+
+  it('deals fewer cards when damaged; locked registers merge on setProgram', () => {
+    const five = [
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.MOVE1,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_RIGHT,
+      CARD_TYPES.BACK,
+    ];
+    let state = createInitialState({ robots: [{ col: 0, row: 0, damage: 2 }] });
+    state = { ...state, robots: [{ ...state.robots[0], registers: five }] };
+    expect(getHandDrawCount(state.robots[0])).toBe(7);
+    state = dealHands(state);
+    expect(state.robots[0].hand).toHaveLength(7);
+    const pick = state.robots[0].hand.slice(0, 3);
+    state = setProgram(state, 'r1', pick);
+    expect(state.robots[0].registers).toEqual([
+      pick[0],
+      pick[1],
+      pick[2],
+      five[3],
+      five[4],
+    ]);
   });
 
   it('setProgram places 5 cards in registers', () => {

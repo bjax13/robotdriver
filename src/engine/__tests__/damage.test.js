@@ -29,5 +29,6 @@ describe('damage', () => {
     const before = state.robots[1].discard.length;
     state = activateRound(state);
     expect(state.robots[1].discard.length).toBeGreaterThan(before);
+    expect(state.robots[1].damage ?? 0).toBeGreaterThanOrEqual(1);
   });
 });

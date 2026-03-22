@@ -25,6 +25,9 @@ export function inBounds(board, col, row) {
 /**
  * Check if there is a wall blocking movement from (col, row) toward the given direction.
  * Direction: 0=N, 90=E, 180=S, 270=W.
+ *
+ * A segment may be authored as either cell's edge (e.g. only `N` on the cell below the line).
+ * We also check the complementary edge on the adjacent cell so south from (c,r) matches `N` on (c,r+1).
  * @param {import('./types').Board} board
  * @param {number} col
  * @param {number} row
@@ -33,7 +36,18 @@ export function inBounds(board, col, row) {
  */
 export function hasWall(board, col, row, direction) {
   const edge = directionToEdge(direction);
-  return !!board.walls[wallKey(col, row, edge)];
+  if (board.walls[wallKey(col, row, edge)]) return true;
+
+  if (direction === 0) {
+    if (row > 0 && board.walls[wallKey(col, row - 1, 'S')]) return true;
+  } else if (direction === 180) {
+    if (row + 1 < board.height && board.walls[wallKey(col, row + 1, 'N')]) return true;
+  } else if (direction === 90) {
+    if (col + 1 < board.width && board.walls[wallKey(col + 1, row, 'W')]) return true;
+  } else if (direction === 270) {
+    if (col > 0 && board.walls[wallKey(col - 1, row, 'E')]) return true;
+  }
+  return false;
 }
 
 function directionToEdge(direction) {

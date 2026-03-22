@@ -12,7 +12,11 @@ export {
   activateRegister,
   activateRegisterWithEvents,
   activateRound,
+  getLockedRegisterCount,
+  getUnlockedRegisterCount,
+  getHandDrawCount,
 } from './activation.js';
+export { pickProgram } from './autoplay.js';
 export { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
 export { raycast } from './lasers.js';
 export { isPit } from './board.js';

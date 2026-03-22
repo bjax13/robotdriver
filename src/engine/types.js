@@ -45,6 +45,9 @@
  * @property {(string|null)[]} [registers] - 5 slots, card type or null
  * @property {number} [energy]
  * @property {number} [nextCheckpoint] - index of next board.checkpoints[] to complete (0-based)
+ * @property {number} [spawnCol] - archive / reboot column (defaults to start; updates on checkpoint)
+ * @property {number} [spawnRow]
+ * @property {number} [damage] - damage tokens (smaller hand; locks high registers)
  */
 
 /**
