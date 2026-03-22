@@ -47,10 +47,52 @@ export function listLaserHits(board, robots) {
   const hits = [];
   for (const robot of robots) {
     if (robot.rebooted) continue;
+    if (robot.powerDownThisRound) continue;
     const hit = raycast(board, robots, robot.col, robot.row, robot.direction, robot.id);
     if (hit) hits.push({ shooterId: robot.id, targetId: hit.id });
   }
   return hits;
+}
+
+/**
+ * Stable id for event log / dedupe (not a robot id).
+ * @param {number} col
+ * @param {number} row
+ * @param {number} direction
+ */
+export function boardLaserShooterId(col, row, direction) {
+  return `wall:${col},${row}:${direction}`;
+}
+
+/**
+ * Wall-mounted beams: same geometry as a robot laser originating at (col,row) facing direction.
+ * @param {import('./types').Board} board
+ * @param {import('./types').Robot[]} robots
+ * @returns {{ shooterId: string, targetId: string }[]}
+ */
+export function listBoardLaserHits(board, robots) {
+  const emitters = board.boardLasers;
+  if (!emitters?.length) return [];
+  const hits = [];
+  for (const em of emitters) {
+    const hit = raycast(board, robots, em.col, em.row, em.direction);
+    if (hit) {
+      hits.push({
+        shooterId: boardLaserShooterId(em.col, em.row, em.direction),
+        targetId: hit.id,
+      });
+    }
+  }
+  return hits;
+}
+
+/**
+ * Robot lasers then wall lasers (Robo Rally: factory beams in same laser step).
+ * @param {import('./types').Board} board
+ * @param {import('./types').Robot[]} robots
+ */
+export function listAllLaserHits(board, robots) {
+  return [...listLaserHits(board, robots), ...listBoardLaserHits(board, robots)];
 }
 
 /**

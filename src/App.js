@@ -34,6 +34,8 @@ import {
   getUnlockedRegisterCount,
   getHandDrawCount,
   MAX_DAMAGE,
+  declarePowerDown,
+  powerDownChance,
 } from "./engine";
 
 const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
@@ -54,8 +56,11 @@ const DEMO_WALLS = [
   { col: 4, row: 2, edge: "N" },
 ];
 
+/** Factory wall lasers (same geometry as robot beams). */
+const DEMO_BOARD_LASERS = [{ col: 9, row: 0, direction: 270 }];
+
 function buildDemoBoardAndRobots() {
-  const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS);
+  const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS, DEMO_BOARD_LASERS);
   const excludeCells = new Set(["0,0", "2,0", "4,0"]);
   const rand = mulberry32(DEMO_BOARD_SEED >>> 0);
   placeRandomCheckpoints(board, 3, rand, {
@@ -195,6 +200,83 @@ function hashStringToSeed(s) {
 
 const EMPTY_EVENT_LOG = [];
 
+/**
+ * If greedy pick fails, fill registers from hand using RNG (avoids repeating last round's program).
+ * @param {string[]} hand
+ * @param {number} need
+ * @param {() => number} rand
+ */
+function randomPicksFromHand(hand, need, rand) {
+  if (hand.length < need) return [];
+  const pool = [...hand];
+  const picks = [];
+  for (let i = 0; i < need; i++) {
+    const j = Math.floor(rand() * pool.length);
+    picks.push(pool[j]);
+    pool.splice(j, 1);
+  }
+  return picks;
+}
+
+/**
+ * Fill unlocked registers using greedy pickProgram.
+ * @param {*} state
+ * @param {string} seedStr
+ * @param {number} [rngMix] - XOR into PRNG seed so each round/button press varies (bots get new plans).
+ * @param {{ allowAutoPowerDown?: boolean }} [opts]
+ */
+function applyAutoplayProgramsToState(state, seedStr, rngMix, opts = {}) {
+  const allowAutoPowerDown = opts.allowAutoPowerDown !== false;
+  const trimmed = typeof seedStr === "string" ? seedStr.trim() : "";
+  const base = trimmed ? hashStringToSeed(trimmed) : 0;
+  const mix =
+    rngMix !== undefined && rngMix !== null
+      ? rngMix >>> 0
+      : (Date.now() ^ (Math.imul(17, state.robots.length + 1))) >>> 0;
+  const posMix = state.robots.reduce(
+    (acc, r) =>
+      (acc +
+        Math.imul(r.col, 131) +
+        Math.imul(r.row, 17) +
+        (r.nextCheckpoint ?? 0) * 3 +
+        (r.direction | 0)) >>>
+      0,
+    0
+  );
+  const seed0 = (base ^ mix ^ posMix) >>> 0;
+  const rand = mulberry32(seed0);
+  let next = state;
+  for (const r of state.robots) {
+    const cur = next.robots.find((x) => x.id === r.id);
+    if (!cur || cur.rebooted) continue;
+    if (cur.powerDownThisRound) continue;
+    if (
+      allowAutoPowerDown &&
+      (cur.damage ?? 0) > 0 &&
+      rand() < powerDownChance(cur.damage)
+    ) {
+      next = declarePowerDown(next, r.id);
+      continue;
+    }
+    const need = getUnlockedRegisterCount(cur);
+    const h = cur.hand || [];
+    if (need === 0) {
+      if ((cur.registers?.length ?? 0) === 5) {
+        next = setProgram(next, r.id, []);
+      }
+      continue;
+    }
+    if (h.length < need) continue;
+    let picks = pickProgram(next, r.id, rand);
+    if (picks.length !== need) {
+      picks = randomPicksFromHand(h, need, rand);
+    }
+    if (picks.length !== need) continue;
+    next = setProgram(next, r.id, picks);
+  }
+  return next;
+}
+
 function App() {
   const canvasRef = useRef(null);
   const eventLogRef = useRef(null);
@@ -204,7 +286,12 @@ function App() {
   const [activationSession, setActivationSession] = useState(null);
   const [autoplaySeed, setAutoplaySeed] = useState("");
   const [autoStep, setAutoStep] = useState(false);
+  const [autoDealBetweenRounds, setAutoDealBetweenRounds] = useState(false);
+  const [autoPowerDownBots, setAutoPowerDownBots] = useState(true);
   const [autoStepMs, setAutoStepMs] = useState(800);
+  const [dismissedWinnerId, setDismissedWinnerId] = useState(null);
+  const wrapHandledSessionRef = useRef(null);
+  const autoplayRngMixRef = useRef(1);
 
   const program = programDrafts[selectedRobotId] ?? [];
 
@@ -232,9 +319,10 @@ function App() {
     }
   }, [activationSession]);
 
-  const clearActivationSession = useCallback(() => {
+  const clearActivationSession = useCallback((options = {}) => {
+    const preserveAutoStep = options.preserveAutoStep ?? false;
     setActivationSession(null);
-    setAutoStep(false);
+    if (!preserveAutoStep) setAutoStep(false);
   }, []);
 
   const goNextRegister = useCallback(() => {
@@ -383,13 +471,52 @@ function App() {
   goNextRef.current = goNextRegister;
 
   useEffect(() => {
-    if (!autoStep || !allRobotsProgrammed) return undefined;
+    if (!autoStep || !allRobotsProgrammed || gameState.winner) return undefined;
     if (activationSession && activationSession.completedCount >= 5) return undefined;
     const id = setInterval(() => {
       goNextRef.current();
     }, Math.max(200, autoStepMs));
     return () => clearInterval(id);
-  }, [autoStep, autoStepMs, allRobotsProgrammed, activationSession?.completedCount]);
+  }, [
+    autoStep,
+    autoStepMs,
+    allRobotsProgrammed,
+    activationSession?.completedCount,
+    gameState.winner,
+  ]);
+
+  useEffect(() => {
+    if (!activationSession) {
+      wrapHandledSessionRef.current = null;
+      return;
+    }
+    if (activationSession.completedCount !== 5) return;
+    if (!autoDealBetweenRounds || !autoStep) return;
+    if (wrapHandledSessionRef.current === activationSession) return;
+    wrapHandledSessionRef.current = activationSession;
+
+    const merged = activationSession.snapshots[5];
+    if (merged.winner) {
+      dispatch({ type: "MERGE_STATE", payload: merged });
+      clearActivationSession({ preserveAutoStep: true });
+      return;
+    }
+    const afterDeal = dealHands(merged);
+    autoplayRngMixRef.current = (autoplayRngMixRef.current + 1) >>> 0;
+    const next = applyAutoplayProgramsToState(afterDeal, autoplaySeed, autoplayRngMixRef.current, {
+      allowAutoPowerDown: autoPowerDownBots,
+    });
+    dispatch({ type: "MERGE_STATE", payload: next });
+    clearActivationSession({ preserveAutoStep: true });
+    setProgramDrafts({});
+  }, [
+    activationSession,
+    autoDealBetweenRounds,
+    autoStep,
+    autoplaySeed,
+    autoPowerDownBots,
+    clearActivationSession,
+  ]);
 
   const selectedRobot = gameState.robots.find((r) => r.id === selectedRobotId);
   const hand = selectedRobot?.hand || [];
@@ -401,6 +528,7 @@ function App() {
   const canProgram =
     !!selectedRobot &&
     !selectedRobot.rebooted &&
+    !selectedRobot.powerDownThisRound &&
     ((lockedRegs.length === 5 && unlockedSlots === 0 && program.length === 0) ||
       (unlockedSlots > 0 &&
         hand.length >= unlockedSlots &&
@@ -445,26 +573,18 @@ function App() {
   const onAutoplayPrograms = () => {
     mergeSessionTipToGame();
     clearActivationSession();
-    const seedStr = autoplaySeed.trim();
-    const seed0 = seedStr ? hashStringToSeed(seedStr) : (Date.now() & 0xffffffff) >>> 0;
-    const rand = mulberry32(seed0 >>> 0);
-    let next = gameState;
-    for (const r of gameState.robots) {
-      if (r.rebooted) continue;
-      const need = getUnlockedRegisterCount(r);
-      const h = r.hand || [];
-      if (need === 0) {
-        if ((r.registers?.length ?? 0) === 5) {
-          next = setProgram(next, r.id, []);
-        }
-        continue;
-      }
-      if (h.length < need) continue;
-      const picks = pickProgram(next, r.id, rand);
-      if (picks.length !== need) continue;
-      next = setProgram(next, r.id, picks);
-    }
+    autoplayRngMixRef.current = (autoplayRngMixRef.current + 1) >>> 0;
+    const next = applyAutoplayProgramsToState(gameState, autoplaySeed, autoplayRngMixRef.current, {
+      allowAutoPowerDown: autoPowerDownBots,
+    });
     dispatch({ type: "MERGE_STATE", payload: next });
+    setProgramDrafts({});
+  };
+
+  const onDeclarePowerDown = () => {
+    mergeSessionTipToGame();
+    clearActivationSession();
+    dispatch({ type: "MERGE_STATE", payload: declarePowerDown(gameState, selectedRobotId) });
     setProgramDrafts({});
   };
 
@@ -486,27 +606,55 @@ function App() {
     el.scrollTop = el.scrollHeight;
   }, [log.length, lastLogOrder]);
 
+  const winnerId = displayState.winner;
+  useEffect(() => {
+    if (!winnerId) setDismissedWinnerId(null);
+  }, [winnerId]);
+
+  const showWinModal = Boolean(winnerId && dismissedWinnerId !== winnerId);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          <canvas ref={canvasRef} />
+      {showWinModal && (
+        <div
+          className="winModalBackdrop"
+          role="presentation"
+          onClick={() => setDismissedWinnerId(winnerId)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setDismissedWinnerId(winnerId);
+          }}
+        >
           <div
-            ref={eventLogRef}
-            style={{
-              minWidth: 280,
-              maxWidth: 420,
-              maxHeight: 280,
-              overflowY: "auto",
-              border: "1px solid #ccc",
-              padding: 8,
-              fontSize: 12,
-              textAlign: "left",
-            }}
+            className="winModalPanel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="win-modal-title"
+            onClick={(e) => e.stopPropagation()}
           >
+            <h2 id="win-modal-title" className="winModalTitle">
+              Win
+            </h2>
+            <p className="winModalBody">First to the final flag:</p>
+            <div className="winModalWinner">
+              <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, winnerId)} size={40} />
+              <span className="winModalWinnerLabel">
+                {getRobotDisplayLabel(gameState.robots, winnerId)}
+              </span>
+            </div>
+            <button type="button" className="winModalDismiss" onClick={() => setDismissedWinnerId(winnerId)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      <header className="App-header">
+        <div className="gameMain">
+        <div className="gameTopRow">
+          <canvas ref={canvasRef} />
+          <div ref={eventLogRef} className="eventLogPanel">
             <strong>Event log</strong> (execution order)
             {log.length === 0 && (
-              <div style={{ color: "#666", marginTop: 8 }}>Step registers to record events.</div>
+              <div style={{ color: "#94a3b8", marginTop: 8 }}>Step registers to record events.</div>
             )}
             <ol style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
               {log.map((entry, i) => (
@@ -551,20 +699,49 @@ function App() {
                           verticalAlign: "middle",
                         }}
                       >
-                        <RobotSwatch
-                          colorIndex={getRobotColorIndex(gameState.robots, entry.shooterId)}
-                          size={20}
-                        />
-                        <span>{getRobotDisplayLabel(gameState.robots, entry.shooterId)}</span>
+                        {entry.shooterId.startsWith("wall:") ? (
+                          <span style={{ fontWeight: 600 }}>Wall laser</span>
+                        ) : (
+                          <>
+                            <RobotSwatch
+                              colorIndex={getRobotColorIndex(
+                                gameState.robots,
+                                entry.shooterId
+                              )}
+                              size={20}
+                            />
+                            <span>
+                              {getRobotDisplayLabel(gameState.robots, entry.shooterId)}
+                            </span>
+                          </>
+                        )}
                         <span aria-hidden>→</span>
                         <RobotSwatch
-                          colorIndex={getRobotColorIndex(gameState.robots, entry.targetId)}
+                          colorIndex={getRobotColorIndex(
+                            gameState.robots,
+                            entry.targetId
+                          )}
                           size={20}
                         />
-                        <span>{getRobotDisplayLabel(gameState.robots, entry.targetId)}</span>
+                        <span>
+                          {getRobotDisplayLabel(gameState.robots, entry.targetId)}
+                        </span>
                       </span>
                       {" "}
                       (+1 damage)
+                    </>
+                  )}
+                  {entry.kind === "power_down_heal" && (
+                    <>
+                      {" "}
+                      · Power down complete —{" "}
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <RobotSwatch
+                          colorIndex={getRobotColorIndex(gameState.robots, entry.robotId)}
+                          size={20}
+                        />
+                        {getRobotDisplayLabel(gameState.robots, entry.robotId)} healed to full
+                      </span>
                     </>
                   )}
                   {entry.kind === "board_resolve" && (
@@ -575,16 +752,18 @@ function App() {
             </ol>
           </div>
         </div>
-        {displayState.winner && (
-          <p data-testid="winner" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span>Winner:</span>
-            <RobotSwatch
-              colorIndex={getRobotColorIndex(gameState.robots, displayState.winner)}
-              size={28}
-            />
-            <span>{getRobotDisplayLabel(gameState.robots, displayState.winner)}</span>
-          </p>
-        )}
+        <div className="statusBand" aria-live="polite">
+          {displayState.winner ? (
+            <p data-testid="winner" className="statusBandInner">
+              <span>Winner:</span>
+              <RobotSwatch
+                colorIndex={getRobotColorIndex(gameState.robots, displayState.winner)}
+                size={28}
+              />
+              <span>{getRobotDisplayLabel(gameState.robots, displayState.winner)}</span>
+            </p>
+          ) : null}
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
           <span>Robot:</span>
           {gameState.robots.map((r) => (
@@ -601,19 +780,16 @@ function App() {
             >
               <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={24} />
               {r.id}
+              {r.powerDownThisRound ? (
+                <span style={{ fontSize: 10, color: "#fbbf24", marginLeft: 2 }} title="Powering down">
+                  PD
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 16,
-            padding: "0 8px 8px",
-            alignItems: "center",
-          }}
-        >
-          <span style={{ fontSize: 12, color: "#475569", marginRight: 4 }}>Damage:</span>
+        <div className="hudRow" style={{ paddingTop: 4 }}>
+          <span style={{ fontSize: 12, color: "#94a3b8", marginRight: 4 }}>Damage:</span>
           {displayState.robots.map((r) => (
             <div
               key={r.id}
@@ -621,6 +797,11 @@ function App() {
             >
               <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={20} />
               <span style={{ fontSize: 12, fontWeight: 600 }}>{r.id}</span>
+              {r.powerDownThisRound ? (
+                <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 700 }} title="Power down">
+                  PD
+                </span>
+              ) : null}
               <DamagePips damage={r.damage} maxDamage={MAX_DAMAGE} />
               <span style={{ fontSize: 11, color: "#64748b" }}>
                 {Math.min(r.damage ?? 0, MAX_DAMAGE)}/{MAX_DAMAGE}
@@ -628,12 +809,70 @@ function App() {
             </div>
           ))}
         </div>
+        {(displayState.board.checkpoints?.length ?? 0) > 0 && (
+          <div className="hudRow" style={{ paddingTop: 0 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8", marginRight: 4 }}>Flags:</span>
+            {displayState.robots.map((r) => {
+              const n = displayState.board.checkpoints.length;
+              const nextCp = r.nextCheckpoint ?? 0;
+              const done = Math.max(0, Math.min(nextCp, n));
+              return (
+                <div
+                  key={r.id}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                  aria-label={`${r.id} flags: ${done} of ${n}`}
+                >
+                  <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={20} />
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{r.id}</span>
+                  <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                    {displayState.board.checkpoints.map((_, i) => (
+                      <span
+                        key={i}
+                        title={`Flag ${i + 1}`}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 4,
+                          fontSize: 11,
+                          lineHeight: "16px",
+                          textAlign: "center",
+                          boxSizing: "border-box",
+                          border: "2px solid #b91c1c",
+                          background: nextCp > i ? "rgba(220, 38, 38, 0.35)" : "transparent",
+                          color: "#fecaca",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {nextCp > i ? "✓" : i + 1}
+                      </span>
+                    ))}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>
+                    {done}/{n}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8 }}>
           <button type="button" onClick={onDeal}>
             Deal Hand
           </button>
           <button type="button" onClick={onCommitProgram} disabled={!canProgram}>
             Commit program ({selectedRobotId})
+          </button>
+          <button
+            type="button"
+            onClick={onDeclarePowerDown}
+            disabled={
+              !selectedRobot ||
+              selectedRobot.rebooted ||
+              !!selectedRobot.powerDownThisRound
+            }
+            title="No program moves this round; heal to full damage after 5 registers (still on board / conveyors / lasers)"
+          >
+            Power down ({selectedRobotId})
           </button>
           <button type="button" onClick={onRunRound} disabled={!allRobotsProgrammed}>
             Run round (instant)
@@ -679,6 +918,29 @@ function App() {
             />
             Auto-advance registers
           </label>
+          <label
+            style={{ display: "flex", gap: 6, alignItems: "center", opacity: autoStep ? 1 : 0.55 }}
+            title={autoStep ? "" : "Turn on auto-advance registers first"}
+          >
+            <input
+              type="checkbox"
+              checked={autoDealBetweenRounds}
+              disabled={!autoStep}
+              onChange={(e) => setAutoDealBetweenRounds(e.target.checked)}
+            />
+            Auto deal &amp; program between rounds
+          </label>
+          <label
+            style={{ display: "flex", gap: 6, alignItems: "center" }}
+            title="When Autoplay programs runs (button or auto chain), damaged bots may power down; odds double per damage token"
+          >
+            <input
+              type="checkbox"
+              checked={autoPowerDownBots}
+              onChange={(e) => setAutoPowerDownBots(e.target.checked)}
+            />
+            Autoplay power-down rolls
+          </label>
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Interval ms
             <input
@@ -714,13 +976,13 @@ function App() {
             Autoplay programs (all robots with hands)
           </button>
         </div>
-        {activationSession && (
-          <p style={{ padding: "0 8px", fontSize: 14 }}>
-            Stepping: register {activationSession.completedCount} / 5 complete (viewing after{" "}
-            {activationSession.completedCount === 0 ? "0" : activationSession.completedCount} register
-            {activationSession.completedCount === 1 ? "" : "s"})
-          </p>
-        )}
+        <p className="steppingLine">
+          {activationSession
+            ? `Stepping: register ${activationSession.completedCount} / 5 complete (viewing after ${
+                activationSession.completedCount === 0 ? "0" : activationSession.completedCount
+              } register${activationSession.completedCount === 1 ? "" : "s"})`
+            : "\u00a0"}
+        </p>
         <div style={{ padding: 8 }}>
           <span style={{ marginRight: 8 }}>
             Registers ({selectedRobotId}) — damage {selectedRobot?.damage ?? 0}/{MAX_DAMAGE}, draw{" "}
@@ -767,6 +1029,7 @@ function App() {
           <button type="button" onClick={() => move("uturn")}>
             U-Turn
           </button>
+        </div>
         </div>
       </header>
     </div>

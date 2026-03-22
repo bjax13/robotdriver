@@ -15,10 +15,16 @@ import { createBoard } from './board.js';
  * @param {{ col: number, row: number }[]} [course.checkpoints]
  * @param {{ col: number, row: number }[]} [course.pits]
  * @param {{ col: number, row: number }[]} [course.reboot]
+ * @param {{ col: number, row: number, direction: number }[]} [course.boardLasers]
  * @returns {import('./types').Board}
  */
 export function loadCourse(course) {
-  const board = createBoard(course.width, course.height, course.walls || []);
+  const board = createBoard(
+    course.width,
+    course.height,
+    course.walls || [],
+    course.boardLasers
+  );
 
   if (course.conveyors?.length) {
     board.conveyors = {};

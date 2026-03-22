@@ -60,14 +60,19 @@ function directionToEdge(direction) {
  * @param {number} width
  * @param {number} height
  * @param {{ col: number, row: number, edge: import('./types').WallEdge }[]} [wallList]
+ * @param {{ col: number, row: number, direction: number }[]} [boardLasers] - wall-mounted laser emitters
  * @returns {import('./types').Board}
  */
-export function createBoard(width, height, wallList = []) {
+export function createBoard(width, height, wallList = [], boardLasers) {
   const walls = {};
   for (const { col, row, edge } of wallList) {
     walls[wallKey(col, row, edge)] = true;
   }
-  return { width, height, walls };
+  const board = { width, height, walls };
+  if (boardLasers && boardLasers.length > 0) {
+    board.boardLasers = boardLasers;
+  }
+  return board;
 }
 
 /**

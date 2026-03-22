@@ -1,21 +1,22 @@
 /**
- * Goal-directed program selection from current hand (greedy by Manhattan distance).
+ * Goal-directed program selection from current hand (greedy by wall-aware path distance).
  */
 
 import { applyMove } from './gameState.js';
 import { cardToAction } from './cards.js';
 import { getUnlockedRegisterCount } from './activation.js';
+import { shortestGridDistance } from './pathDistance.js';
 
 /**
  * @param {import('./types').Robot} robot
  * @param {import('./types').Board} board
  * @returns {number}
  */
-function manhattanToNextCheckpoint(robot, board) {
+function pathDistanceToNextCheckpoint(robot, board) {
   const idx = robot.nextCheckpoint ?? 0;
   const cp = board.checkpoints?.[idx];
   if (!cp) return 0;
-  return Math.abs(robot.col - cp.col) + Math.abs(robot.row - cp.row);
+  return shortestGridDistance(board, robot.col, robot.row, cp.col, cp.row);
 }
 
 /**
@@ -72,7 +73,7 @@ export function pickProgram(state, robotId, rng) {
     for (let i = 0; i < workHand.length; i++) {
       const after = simApplyProgrammingCard(workState, robotId, workHand[i]);
       const r = after.robots.find((x) => x.id === robotId);
-      const dist = r ? manhattanToNextCheckpoint(r, board) : Infinity;
+      const dist = r ? pathDistanceToNextCheckpoint(r, board) : Infinity;
       if (dist < bestDist) {
         bestDist = dist;
         bestIndices.length = 0;
