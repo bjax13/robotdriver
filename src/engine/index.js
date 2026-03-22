@@ -15,10 +15,11 @@ export {
   getLockedRegisterCount,
   getUnlockedRegisterCount,
   getHandDrawCount,
+  MAX_DAMAGE,
 } from './activation.js';
 export { pickProgram } from './autoplay.js';
 export { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
-export { raycast } from './lasers.js';
+export { raycast, listLaserHits, traceLaserPath } from './lasers.js';
 export { isPit } from './board.js';
 export { addDamage, rebootRobot, drawForSpam, SPAM_CARDS_PER_HIT } from './damage.js';
 export { loadCourse, DIZZY_HIGHWAY } from './courses.js';

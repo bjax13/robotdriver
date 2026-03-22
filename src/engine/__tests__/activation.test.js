@@ -1,3 +1,4 @@
+import { createBoard } from '../board.js';
 import { createInitialState } from '../gameState.js';
 import {
   dealHands,
@@ -102,6 +103,29 @@ describe('activation', () => {
     expect(robotEvents[0].priorityInRegister).toBe(1);
     expect(robotEvents[1].robotId).toBe('r2');
     expect(robotEvents[1].priorityInRegister).toBe(2);
+    expect(events[events.length - 1].kind).toBe('board_resolve');
+  });
+
+  it('activateRegisterWithEvents emits laser_hit when a beam hits another robot', () => {
+    let state = createInitialState({
+      board: createBoard(6, 3),
+      robots: [
+        { col: 1, row: 1, direction: 90 },
+        { col: 3, row: 1, direction: 0 },
+      ],
+      antenna: { col: 0, row: 0 },
+    });
+    const five = Array(5).fill(CARD_TYPES.POWER_UP);
+    state = {
+      ...state,
+      robots: state.robots.map((r) => ({ ...r, registers: five, hand: [] })),
+    };
+    const { events } = activateRegisterWithEvents(state, 0);
+    const laserEvents = events.filter((e) => e.kind === 'laser_hit');
+    expect(laserEvents.length).toBeGreaterThanOrEqual(1);
+    expect(
+      laserEvents.some((e) => e.shooterId === 'r1' && e.targetId === 'r2')
+    ).toBe(true);
     expect(events[events.length - 1].kind).toBe('board_resolve');
   });
 

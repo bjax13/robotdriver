@@ -1,3 +1,6 @@
+import { traceLaserPath } from "./engine/lasers.js";
+import { toPixelCenter } from "./engine/canvasAdapter.js";
+
 export const CANVAS_WIDTH = 300;
 export const CANVAS_HEIGHT = 300;
 export const CELL_SIZE = 30;
@@ -172,6 +175,42 @@ export function drawSpawnMarkers(context, robots, cellSize) {
     context.closePath();
     context.stroke();
   }
+}
+
+/**
+ * Forward laser beams from each active robot (for UI); same geometry as engine raycast.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, walls: object }} board
+ * @param {{ col: number, row: number, direction: number, id: string, rebooted?: boolean }[]} robots
+ * @param {number} cellSize
+ */
+export function drawLaserBeams(context, board, robots, cellSize) {
+  context.save();
+  context.strokeStyle = "rgba(239, 68, 68, 0.55)";
+  context.lineWidth = 3;
+  context.lineCap = "round";
+  context.setLineDash([4, 4]);
+  for (const robot of robots) {
+    if (robot.rebooted) continue;
+    const { path } = traceLaserPath(
+      board,
+      robots,
+      robot.col,
+      robot.row,
+      robot.direction,
+      robot.id
+    );
+    if (path.length === 0) continue;
+    const start = toPixelCenter(robot.col, robot.row, cellSize);
+    context.beginPath();
+    context.moveTo(start.x, start.y);
+    for (const cell of path) {
+      const p = toPixelCenter(cell.col, cell.row, cellSize);
+      context.lineTo(p.x, p.y);
+    }
+    context.stroke();
+  }
+  context.restore();
 }
 
 export function drawStartSlotLabels(context, board, cellSize) {
