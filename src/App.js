@@ -1,537 +1,536 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import "./App.css";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
   CELL_SIZE,
   HALF_CELL_SIZE,
-  checkCollisionWithWalls,
   drawGrid,
   drawRobot,
   drawWalls,
 } from "./App.utils";
+import {
+  createBoard,
+  createInitialState,
+  toPixelCenter,
+  boardToWallSegments,
+  applyMove,
+  dealHands,
+  setProgram,
+  activateRound,
+  activateRegisterWithEvents,
+  CARD_TYPES,
+} from "./engine";
 
-function App() {    
-  const canvasRef = useRef(null);
-  // State for robot's position and direction
-  const [position, setPosition] = useState({
-    x: HALF_CELL_SIZE,
-    y: HALF_CELL_SIZE,
-    direction: 90,
-  });
-  const [walls, setWalls] = useState([
-    { x: 30, y: 0, length: 90, horizontal: false }, // A vertical wall
-    { x: 60, y: 30, length: 90, horizontal: true }, // A horizontal wall
-    { x: 60, y: 60, length: 90, horizontal: true }, // A horizontal wall
-  ]);
+const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
+const GRID_ROWS = CANVAS_HEIGHT / CELL_SIZE;
 
-  const handleKeyPress = (event) => {
-    switch (event.key) {
-      case "ArrowUp":
-        moveForward();
-        break;
-      case "ArrowDown":
-        moveBackward();
-        break;
-      case "ArrowLeft":
-        turnLeft();
-        break;
-      case "ArrowRight":
-        turnRight();
-        break;
-      default:
-        break; // Do nothing if other keys are pressed
-    }
+const initialBoard = createBoard(GRID_COLS, GRID_ROWS, [
+  { col: 0, row: 0, edge: "E" },
+  { col: 0, row: 1, edge: "E" },
+  { col: 0, row: 2, edge: "E" },
+  { col: 2, row: 1, edge: "N" },
+  { col: 3, row: 1, edge: "N" },
+  { col: 4, row: 1, edge: "N" },
+  { col: 2, row: 2, edge: "N" },
+  { col: 3, row: 2, edge: "N" },
+  { col: 4, row: 2, edge: "N" },
+]);
+
+const initialState = createInitialState({
+  board: initialBoard,
+  robots: [
+    { col: 0, row: 0, direction: 90 },
+    { col: 1, row: 0, direction: 90 },
+    { col: 2, row: 0, direction: 180 },
+  ],
+  antenna: { col: 5, row: 5 },
+});
+
+const CARD_LABELS = {
+  [CARD_TYPES.MOVE1]: "Move 1",
+  [CARD_TYPES.MOVE2]: "Move 2",
+  [CARD_TYPES.MOVE3]: "Move 3",
+  [CARD_TYPES.TURN_LEFT]: "Left",
+  [CARD_TYPES.TURN_RIGHT]: "Right",
+  [CARD_TYPES.U_TURN]: "U-Turn",
+  [CARD_TYPES.BACK]: "Back",
+  [CARD_TYPES.POWER_UP]: "Power",
+  [CARD_TYPES.AGAIN]: "Again",
+};
+
+function gameReducer(state, action) {
+  switch (action.type) {
+    case "MOVE":
+      return applyMove(state, action.robotId, action.payload);
+    case "DEAL":
+      return dealHands(state);
+    case "SET_PROGRAM":
+      return setProgram(state, action.robotId, action.payload);
+    case "ACTIVATE":
+      return activateRound(state);
+    case "MERGE_STATE":
+      return action.payload;
+    default:
+      return state;
+  }
+}
+
+function mulberry32(seed) {
+  return function random() {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
 
-  // Function to redraw the canvas
-  const redrawCanvas = () => {
+function hashStringToSeed(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+}
+
+function shuffleCopy(arr, rand) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function App() {
+  const canvasRef = useRef(null);
+  const [gameState, dispatch] = useReducer(gameReducer, initialState);
+  const [selectedRobotId, setSelectedRobotId] = useState("r1");
+  const [programDrafts, setProgramDrafts] = useState({});
+  const [activationSession, setActivationSession] = useState(null);
+  const [autoplaySeed, setAutoplaySeed] = useState("");
+  const [autoStep, setAutoStep] = useState(false);
+  const [autoStepMs, setAutoStepMs] = useState(800);
+
+  const program = programDrafts[selectedRobotId] ?? [];
+
+  const setProgramForSelected = useCallback((next) => {
+    setProgramDrafts((d) => {
+      const cur = d[selectedRobotId] ?? [];
+      const val = typeof next === "function" ? next(cur) : next;
+      return { ...d, [selectedRobotId]: val };
+    });
+  }, [selectedRobotId]);
+
+  const displayState =
+    activationSession?.snapshots?.[activationSession.completedCount] ?? gameState;
+
+  const allRobotsProgrammed = gameState.robots.every(
+    (r) => !r.rebooted && (r.registers?.length ?? 0) === 5
+  );
+
+  const mergeSessionTipToGame = useCallback(() => {
+    if (activationSession && activationSession.completedCount > 0) {
+      dispatch({
+        type: "MERGE_STATE",
+        payload: activationSession.snapshots[activationSession.completedCount],
+      });
+    }
+  }, [activationSession]);
+
+  const clearActivationSession = useCallback(() => {
+    setActivationSession(null);
+    setAutoStep(false);
+  }, []);
+
+  const goNextRegister = useCallback(() => {
+    setActivationSession((session) => {
+      const base =
+        session ?? {
+          snapshots: [structuredClone(gameState)],
+          completedCount: 0,
+          log: [],
+          nextGlobalOrder: 1,
+        };
+      if (base.completedCount >= 5) return base;
+
+      const { state: next, events } = activateRegisterWithEvents(
+        base.snapshots[base.completedCount],
+        base.completedCount
+      );
+
+      let nextOrder = base.nextGlobalOrder;
+      const newLog = [...base.log];
+      for (const ev of events) {
+        newLog.push({ globalOrder: nextOrder++, ...ev });
+      }
+
+      const snapshots = [
+        ...base.snapshots.slice(0, base.completedCount + 1),
+        next,
+      ];
+
+      return {
+        snapshots,
+        completedCount: base.completedCount + 1,
+        log: newLog,
+        nextGlobalOrder: nextOrder,
+      };
+    });
+  }, [gameState]);
+
+  const goPrevRegister = useCallback(() => {
+    setActivationSession((session) => {
+      if (!session || session.completedCount < 1) return session;
+      const completedCount = session.completedCount - 1;
+      const snapshots = session.snapshots.slice(0, completedCount + 1);
+      const log = session.log.filter((e) => e.registerIndex < completedCount);
+      const nextGlobalOrder =
+        log.reduce((m, e) => Math.max(m, e.globalOrder), 0) + 1 || 1;
+      return {
+        ...session,
+        snapshots,
+        completedCount,
+        log,
+        nextGlobalOrder,
+      };
+    });
+  }, []);
+
+  const repeatLastRegister = useCallback(() => {
+    setActivationSession((session) => {
+      if (!session || session.completedCount < 1) return session;
+      const regIdx = session.completedCount - 1;
+      const { state: next, events } = activateRegisterWithEvents(
+        session.snapshots[regIdx],
+        regIdx
+      );
+      const snapshots = [
+        ...session.snapshots.slice(0, session.completedCount),
+        next,
+      ];
+      const log = session.log.filter((e) => e.registerIndex !== regIdx);
+      let nextOrder = log.reduce((m, e) => Math.max(m, e.globalOrder), 0) + 1 || 1;
+      const newLog = [...log];
+      for (const ev of events) {
+        newLog.push({ globalOrder: nextOrder++, ...ev });
+      }
+      return {
+        ...session,
+        snapshots,
+        log: newLog,
+        nextGlobalOrder: nextOrder,
+      };
+    });
+  }, []);
+
+  const move = useCallback(
+    (action) => {
+      dispatch({ type: "MOVE", robotId: selectedRobotId, payload: action });
+    },
+    [selectedRobotId]
+  );
+
+  const handleKeyPress = useCallback(
+    (event) => {
+      switch (event.key) {
+        case "ArrowUp":
+          move("move1");
+          break;
+        case "ArrowDown":
+          move("back");
+          break;
+        case "ArrowLeft":
+          move("turnLeft");
+          break;
+        case "ArrowRight":
+          move("turnRight");
+          break;
+        default:
+          break;
+      }
+    },
+    [move]
+  );
+
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
+    const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
-    drawRobot(
-      context,
-      position.x,
-      position.y,
-      HALF_CELL_SIZE,
-      position.direction
-    );
-  };
+    displayState.robots.forEach((robot, index) => {
+      const { x, y } = toPixelCenter(robot.col, robot.row, CELL_SIZE);
+      drawRobot(context, x, y, HALF_CELL_SIZE, robot.direction, index);
+    });
+  }, [displayState]);
 
   useEffect(() => {
-    // Set up the keydown event listener
     window.addEventListener("keydown", handleKeyPress);
-
-    // Clean up the event listener
-    return () => {
-      window.removeEventListener("keydown", handleKeyPress);
-    };
-  });
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [handleKeyPress]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
-    redrawCanvas();
-  }, [position]); // Redraw when position changes
-
-  // Move actions
-  const moveForward = () => {
-    const { x, y, direction } = position;
-    let newX = x,
-      newY = y;
-
-    if (direction === 0 && y - CELL_SIZE >= 0) newY -= CELL_SIZE;
-    else if (direction === 90 && x + CELL_SIZE < CANVAS_WIDTH)
-      newX += CELL_SIZE;
-    else if (direction === 180 && y + CELL_SIZE < CANVAS_HEIGHT)
-      newY += CELL_SIZE;
-    else if (direction === 270 && x - CELL_SIZE >= 0) newX -= CELL_SIZE;
-
-    if (
-      !checkCollisionWithWalls(newX, newY, walls, direction, true) &&
-      (newX !== x || newY !== y)
-    ) {
-      setPosition({ x: newX, y: newY, direction });
+    if (canvas) {
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
+      redrawCanvas();
     }
+  }, [redrawCanvas]);
+
+  const goNextRef = useRef(goNextRegister);
+  goNextRef.current = goNextRegister;
+
+  useEffect(() => {
+    if (!autoStep || !allRobotsProgrammed) return undefined;
+    if (activationSession && activationSession.completedCount >= 5) return undefined;
+    const id = setInterval(() => {
+      goNextRef.current();
+    }, Math.max(200, autoStepMs));
+    return () => clearInterval(id);
+  }, [autoStep, autoStepMs, allRobotsProgrammed, activationSession?.completedCount]);
+
+  const selectedRobot = gameState.robots.find((r) => r.id === selectedRobotId);
+  const hand = selectedRobot?.hand || [];
+  const canProgram = hand.length >= 5 && program.length === 5;
+
+  const addToProgram = (card) => {
+    if (program.length >= 5) return;
+    const inHand = hand.filter((c) => c === card).length;
+    const inProgram = program.filter((c) => c === card).length;
+    if (inProgram < inHand) setProgramForSelected([...program, card]);
   };
 
-  const moveBackward = () => {
-    // Update position based on direction, moving backward
-    const { x, y, direction } = position;
-    let newX = x,
-      newY = y;
-    if (direction === 0 && y + CELL_SIZE < CANVAS_HEIGHT) newY += CELL_SIZE;
-    else if (direction === 90 && x - CELL_SIZE >= 0) newX -= CELL_SIZE;
-    else if (direction === 180 && y - CELL_SIZE >= 0) newY -= CELL_SIZE;
-    else if (direction === 270 && x + CELL_SIZE < CANVAS_WIDTH)
-      newX += CELL_SIZE;
+  const removeFromProgram = (idx) => {
+    setProgramForSelected(program.filter((_, i) => i !== idx));
+  };
 
-    if (
-      !checkCollisionWithWalls(newX, newY, walls, direction, false) &&
-      (newX !== x || newY !== y)
-    ) {
-      setPosition({ x: newX, y: newY, direction });
+  const onDeal = () => {
+    mergeSessionTipToGame();
+    clearActivationSession();
+    dispatch({ type: "DEAL" });
+  };
+
+  const onCommitProgram = () => {
+    dispatch({ type: "SET_PROGRAM", robotId: selectedRobotId, payload: program });
+    setProgramForSelected([]);
+  };
+
+  const onRunRound = () => {
+    mergeSessionTipToGame();
+    clearActivationSession();
+    dispatch({ type: "ACTIVATE" });
+  };
+
+  const onAutoplayPrograms = () => {
+    mergeSessionTipToGame();
+    clearActivationSession();
+    const seedStr = autoplaySeed.trim();
+    const seed0 = seedStr ? hashStringToSeed(seedStr) : (Date.now() & 0xffffffff) >>> 0;
+    const rand = mulberry32(seed0 >>> 0);
+    let next = gameState;
+    for (const r of gameState.robots) {
+      if (r.rebooted) continue;
+      const h = r.hand || [];
+      if (h.length < 5) continue;
+      const five = shuffleCopy(h, rand).slice(0, 5);
+      next = setProgram(next, r.id, five);
     }
+    dispatch({ type: "MERGE_STATE", payload: next });
+    setProgramDrafts({});
   };
 
-  const turnLeft = () => {
-    // Update direction by subtracting 90 degrees
-    const newDirection = (position.direction - 90 + 360) % 360;
-    setPosition({ ...position, direction: newDirection });
+  const onSaveSteppedRound = () => {
+    if (!activationSession || activationSession.completedCount < 1) return;
+    dispatch({
+      type: "MERGE_STATE",
+      payload: activationSession.snapshots[activationSession.completedCount],
+    });
+    clearActivationSession();
   };
 
-  const turnRight = () => {
-    // Update direction by adding 90 degrees
-    const newDirection = (position.direction + 90) % 360;
-    setPosition({ ...position, direction: newDirection });
-  };
-
-  const uTurn = () => {
-    // Update direction by adding 180 degrees
-    const newDirection = (position.direction + 180) % 360;
-    setPosition({ ...position, direction: newDirection });
-  };
-
-  function decodeCipherArray(codedTextArray) {
-    // Translation map based on the mappings we identified
-    const translationMap = {
-      a: "x",
-      b: "y", //
-      c: "z",
-      d: "a", //
-      e: "b", //
-      f: "c",
-      g: "d", //
-      h: "e", //
-      i: "f", //
-      j: "g", //
-      k: "h",
-      l: "i", //
-      m: "j",
-      n: "k",
-      o: "l", //
-      p: "m",
-      q: "n", //
-      r: "o", //
-      s: "p",
-      t: "q",
-      u: "r", //
-      v: "s", //
-      w: "t", //
-      x: "u",
-      y: "v",
-      z: "w",
-      0: "0",
-      1: "1",
-      2: "2",
-      3: "3",
-      4: "4",
-      _: "?",
-    };
-
-    // Function to decode a single coded text
-    const decodeText = (text) => {
-      let decodedText = "";
-      for (let char of text) {
-        // Translate if the character is in the map, else return the character as-is
-        decodedText += translationMap[char] || char;
-      }
-      return decodedText;
-    };
-
-    // Decode each string in the input array
-    const decodedTextArray = codedTextArray.map((text) => decodeText(text));
-
-    return decodedTextArray;
-  }
-
-  // Example usage:
-  const codedTextArray = [
-    "_ghdiehhi",
-"_uhjjdh_ulgglp",
-"_wuhqwh_",
-"0aehqghu",
-"0aelccb",
-"0aeuhqw",
-"0afbjddu",
-"0agllg",
-"0agxunoh",
-"0ahoulf_hwk",
-"0alw4l",
-"0amxvwdghy",
-"0andudwh",
-"0aplnhwkuhh",
-"0aporz",
-"0atxlw",
-"0avwhdgb",
-"0avzdklol",
-"0acdpxqgd",
-"0acdpxqgd",
-"1emda",
-"3ruryln",
-"3vodvkp",
-"deudkdppdbrujd",
-"dfhrqhghvljq",
-"dgdpkxvwohv",
-"dgdpvprrw",
-"dnluduhordghg",
-"dodqidofrq",
-"doodglq_fubswr",
-"doohbfdwqiw",
-"dowfrlqfhr",
-"dowv_dqrqbprxv",
-"dqgu3z",
-"dqgb8052",
-"dqrqdndpljr",
-"dqwkrqbwm20",
-"dsh6743",
-"dsh7458",
-"dufdqlfqiw",
-"dufklyxp_qm",
-"duv0qlf",
-"duv0qlf",
-"duwrqeorfnfkdlq",
-"dvkohbgfdq",
-"dvnmhhpv",
-"dyhqwxulqh_hwk",
-"dap_adqghu",
-"edjkroglqjqiwv",
-"edqglwpihu",
-"edqgrqiw",
-"edqnv",
-"eduwkdcldq",
-"edbf5511",
-"eljpdq3wk",
-"eloobp2n",
-"elwerbmdb",
-"elwfrlqorxlh",
-"eorfndqdold",
-"eorqglh23opg",
-"eoxhprrrq",
-"erogohrqlgdv",
-"eruhgdsh93",
-"eruhgorjdqqc",
-"eruqrvru",
-"erwmdfnsrw",
-"eudgbjzuljkw",
-"euxqqrhwk",
-"eubdqeulqnpdq",
-"fdproqiw",
-"fdugpdqmrqhv",
-"fduolql8qiw",
-"fkdgvfdoshu",
-"fkdlqohiwlvw",
-"fkdlqyluxv",
-"fkdpsdjqhpdq",
-"fkdpswjudp",
-"folii_hvt",
-"fprqhbwudglqj",
-"frfr__ehdu",
-"frqfuhwhqiw",
-"frvwdiihfwlyh",
-"frxvlqjuhjqiw",
-"frcbzbdww",
-"fu0vvhwk",
-"fudvkeorvvrp1",
-"fubswrkrrwnlqj",
-"fubswrmg_1",
-"fubswrsxqn3129",
-"fubswrvwrup__",
-"fubswrwvdu4",
-"fxuyhwkrwv",
-"fydoohb_",
-"fberxujhrlvlh",
-"g34wkvw4onhu",
-"g3vn_",
-"gdexqqbriilfldo",
-"gdfkvkxqgzlcdug",
-"gdpvnrwudghv",
-"gdq_vlfnohv",
-"gduolqjwrq",
-"gduzlqqxqhchwk",
-"gdy_lrw",
-"ghdgsrodurlgc",
-"ghexvvb100",
-"ghfhqwudodlv",
-"ghhseoxhvwhhyh",
-"ghhch",
-"ghjhqfkdulwb",
-"ghjhqwudodqg",
-"ghyrqiljxuhv",
-"glqjdolqjwv",
-"gmukhwruln",
-"grmliols",
-"grmlqqdwlrq",
-"groodu_prqrsrob",
-"gxwfkwlgh",
-"gzbhu1987",
-"gbodqruuhol",
-"hdvbhdwverghjd",
-"he7",
-"howrurqiw",
-"hwk_qdwlrq",
-"hyloyrahov",
-"hashfwhgydoxh_",
-"idghgdoskd_",
-"idurnk",
-"imyge7",
-"iodvkqiw",
-"irpr_edjv",
-"irredccohu",
-"iravoljkwob",
-"iaqfwlrq",
-"jfdq9n",
-"jhh__jdccd",
-"jhjjohwr",
-"jhwprrqjorz",
-"jixqnhud86",
-"jldqlqdvnduohww",
-"jprqhbqiw",
-"jrzhvwewf",
-"judnhjudnh",
-"juhjmuqrupdq",
-"jxlgrglvdooh",
-"kdquje",
-"kduguljkwhgjh1",
-"khgjhgkrj",
-"khoorlpprujdq",
-"khqor_hwk",
-"khwkdwjlyhhwk",
-"kljk_idghv",
-"klmrkqerzhuv",
-"kroodqghudgdp",
-"krvvdib",
-"kwnbhylq",
-"kwnbhylq",
-"kxqwhuruuhoo",
-"kbshuvshn",
-"l_dp_d_prpr",
-"ldjrfyv",
-"ldp_phwdplnh",
-"ldpdtvdvkdlnk",
-"ldpgflqyhvwru",
-"loodgdsurgxfhu",
-"lpqrwnluhl",
-"lwphpxvkb",
-"lcheho_hwk",
-"m[vkrrn]",
-"m1ppbhwk",
-"mdgbvwdqd",
-"mdplhvrqkloo",
-"mgxeed",
-"mhuhpbnqrzvyi",
-"mihoocc",
-"mkrojxlq",
-"mrhbprrrvh",
-"mrvlhehoolql",
-"mxdqvqrz",
-"mxoldnxhpshu",
-"mxvwlqwulpeoh",
-"ndljdql",
-"ndqhzdoopdqq",
-"nhylqilqdoervx",
-"nlqghu_qiw_duw",
-"nlwwbfdwuljkwp3",
-"nprqhb_69",
-"nqrzqdvgroodu",
-"nrgdpd_hwk",
-"nrcbdwwlf",
-"nxurnhk",
-"oduubdqodbdpdq",
-"odcbsdqgd_01",
-"oh9hgr",
-"ohds_abc",
-"ohfudeheohx",
-"ohjhqg",
-"ophrzlf",
-"orehv604",
-"orugf0cb",
-"oruhn_whpsodu",
-"oxfdqhwc",
-"oxljl_qiw",
-"oxnhfdqqrq727",
-"pdffdqchwk",
-"pdgpda_qiwv",
-"pdjqxp",
-"pdqwdqiw",
-"pdund_hwk",
-"pdunbphwdyhuvh",
-"pdwwphgyhg",
-"peo267_qiw",
-"phdgrzpdutxh",
-"phgldjludiihv",
-"phwlqnxpux",
-"plnhjhh",
-"plnhb_elj69",
-"plnlglgwklv",
-"plqlvwhuriqiwv",
-"prnvkd_gdv",
-"prrqfdw2878",
-"prrqryhuorug",
-"pruhzloolh",
-"prxwkhg_vnuuu",
-"puizdvkhuh",
-"qdkllnr",
-"qdwhdohaqiw",
-"qhvvqlvvod",
-"qiwdubdqq",
-"qiwerl_",
-"qiwfdol_hwk",
-"qiwodqg",
-"qiwqrre",
-"qiwwdqn",
-"qiwzds",
-"qlfnvgmrkqvrq",
-"qrqixqjhuelov",
-"qrwdjdpeou",
-"qrwfubswreur",
-"qrwiubgrwhwk",
-"qrwwkuhdgjxb",
-"qxoolqjhu",
-"qbgrrupdq",
-"rjgiduphu",
-"rkkvklqb",
-"rpc_qiw",
-"rqobwrdvwhg",
-"rwwrvxzhq",
-"raabb13",
-"sdudoohodluhy",
-"sklolssojk",
-"skrpr_hwk",
-"sldqrpdq",
-"slaov_grw_hwk",
-"spdq555",
-"srrslh",
-"srurhwk",
-"sudqnvb",
-"surrifubswrghy",
-"sxqn3178",
-"sxqn6529",
-"sbuff",
-"sburqiw",
-"udvloolgrwhwk",
-"uhgehdugqiw",
-"uhgolrqhbh",
-"uhvddqj",
-"ukhww",
-"ulfhiduphuqiw",
-"urfnhwjluoqiw",
-"urxjkvsdunv",
-"urxjkvsdunv",
-"urbdwkb_",
-"vdpvjpv",
-"vdudk_vfulsw",
-"vduwrvkl_uls",
-"vdwpdq78704554",
-"vfrww_ohz_lv",
-"vhuf1q",
-"vhujlwrvhujlwr",
-"vkdqwbdgrq",
-"vkleerohwk88",
-"vko0pv",
-"vlprq_jrogehuj",
-"vlprq_vdbc13",
-"vriwerrelh5",
-"vrogwkherwwrp",
-"vsdfhudfhua",
-"vsdqnbexpsv",
-"vtxljjohcccvtx1",
-"vvmaew",
-"vwhoodfdw4",
-"vwudqjhqhljkeuv",
-"vxshuuduhurvhv",
-"wdgohhu",
-"wdnhqvwkhruhp",
-"wkdqnbrxa",
-"wkhededjrrvh",
-"wkhjuhhnwbfrrq1",
-"wkhkrorfdw",
-"wkhrqobqhvvlh",
-"wkhsuri_vpv",
-"wkhvpdupbexp",
-"wklvlvqxvh",
-"wkuhdgrru",
-"wmf345",
-"wrnhqira1",
-"wrwgjewdje",
-"wudyl3000",
-"wuhhhwk",
-"wuhyrumrqhvduw",
-"wulvolw",
-"wursriduphu",
-"wvfkxxxxob",
-"wzhhwb_qiw",
-"xfflr_qiw",
-"xowudsdud",
-"ydoxhdqgwlph",
-"ylfw1plch",
-"yrkyrkk",
-"yrqplvhv14",
-"zdegrwhwk",
-"zhuhnlwwb1",
-"zlfnhgobqiw",
-"zloo__sulfh",
-"zlwkhuvsdqn",
-"zlcdugrivrkr",
-"zruogrierqcr",
-"zveprg",
-]; // Add more coded texts as needed
-  const decodedTextArray = decodeCipherArray(codedTextArray);
-  console.log(decodedTextArray);
+  const log = activationSession?.log ?? [];
 
   return (
     <div className="App">
       <header className="App-header">
-        <canvas ref={canvasRef} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
+          <canvas ref={canvasRef} />
+          <div
+            style={{
+              minWidth: 280,
+              maxWidth: 420,
+              maxHeight: 280,
+              overflowY: "auto",
+              border: "1px solid #ccc",
+              padding: 8,
+              fontSize: 12,
+              textAlign: "left",
+            }}
+          >
+            <strong>Event log</strong> (execution order)
+            {log.length === 0 && (
+              <div style={{ color: "#666", marginTop: 8 }}>Step registers to record events.</div>
+            )}
+            <ol style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
+              {log.map((entry, i) => (
+                <li key={`${entry.globalOrder}-${i}`} style={{ marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>#{entry.globalOrder}</span>{" "}
+                  Reg {entry.registerIndex + 1}
+                  {entry.kind === "robot_action" && (
+                    <>
+                      {" "}
+                      · P{entry.priorityInRegister} · {entry.robotId} ·{" "}
+                      {CARD_LABELS[entry.card] || entry.card} → {entry.action}
+                    </>
+                  )}
+                  {entry.kind === "board_resolve" && (
+                    <> · board: {entry.details}</>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+        {displayState.winner && (
+          <p data-testid="winner">Winner: {displayState.winner}</p>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
+          <span>Robot:</span>
+          {gameState.robots.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setSelectedRobotId(r.id)}
+              style={{
+                fontWeight: selectedRobotId === r.id ? "bold" : "normal",
+              }}
+            >
+              {r.id}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8 }}>
+          <button type="button" onClick={onDeal}>
+            Deal Hand
+          </button>
+          <button type="button" onClick={onCommitProgram} disabled={!canProgram}>
+            Commit program ({selectedRobotId})
+          </button>
+          <button type="button" onClick={onRunRound} disabled={!allRobotsProgrammed}>
+            Run round (instant)
+          </button>
+          <button
+            type="button"
+            onClick={goNextRegister}
+            disabled={!allRobotsProgrammed || (activationSession?.completedCount ?? 0) >= 5}
+          >
+            Next register
+          </button>
+          <button
+            type="button"
+            onClick={goPrevRegister}
+            disabled={!activationSession || activationSession.completedCount < 1}
+          >
+            Previous register
+          </button>
+          <button
+            type="button"
+            onClick={repeatLastRegister}
+            disabled={!activationSession || activationSession.completedCount < 1}
+          >
+            Repeat last register
+          </button>
+          <button
+            type="button"
+            onClick={onSaveSteppedRound}
+            disabled={!activationSession || activationSession.completedCount < 1}
+          >
+            Save stepped state to game
+          </button>
+          <button type="button" onClick={clearActivationSession}>
+            Reset stepping
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={autoStep}
+              onChange={(e) => setAutoStep(e.target.checked)}
+            />
+            Auto-advance registers
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            Interval ms
+            <input
+              type="number"
+              min={200}
+              step={100}
+              value={autoStepMs}
+              onChange={(e) => setAutoStepMs(Number(e.target.value) || 800)}
+              style={{ width: 72 }}
+            />
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Autoplay seed (optional)"
+            value={autoplaySeed}
+            onChange={(e) => setAutoplaySeed(e.target.value)}
+            style={{ width: 160 }}
+          />
+          <button
+            type="button"
+            onClick={onAutoplayPrograms}
+            disabled={!gameState.robots.some((r) => (r.hand?.length ?? 0) >= 5)}
+          >
+            Autoplay programs (all robots with hands)
+          </button>
+        </div>
+        {activationSession && (
+          <p style={{ padding: "0 8px", fontSize: 14 }}>
+            Stepping: register {activationSession.completedCount} / 5 complete (viewing after{" "}
+            {activationSession.completedCount === 0 ? "0" : activationSession.completedCount} register
+            {activationSession.completedCount === 1 ? "" : "s"})
+          </p>
+        )}
+        <div style={{ padding: 8 }}>
+          <span style={{ marginRight: 8 }}>Registers ({selectedRobotId}):</span>
+          {program.map((c, i) => (
+            <button key={i} type="button" onClick={() => removeFromProgram(i)}>
+              {CARD_LABELS[c] || c}
+            </button>
+          ))}
+        </div>
+        <div style={{ padding: 8 }}>
+          <span style={{ marginRight: 8 }}>Hand ({selectedRobotId}):</span>
+          {hand.map((c, i) => (
+            <button key={i} type="button" onClick={() => addToProgram(c)}>
+              {CARD_LABELS[c] || c}
+            </button>
+          ))}
+        </div>
         <div>
-          <button onClick={moveForward}>Forward</button>
-          <button onClick={moveBackward}>Backward</button>
-          <button onClick={turnLeft}>Turn Left</button>
-          <button onClick={turnRight}>Turn Right</button>
-          <button onClick={uTurn}>U-Turn</button>
+          <button type="button" onClick={() => move("move1")}>
+            Forward
+          </button>
+          <button type="button" onClick={() => move("back")}>
+            Backward
+          </button>
+          <button type="button" onClick={() => move("turnLeft")}>
+            Turn Left
+          </button>
+          <button type="button" onClick={() => move("turnRight")}>
+            Turn Right
+          </button>
+          <button type="button" onClick={() => move("uturn")}>
+            U-Turn
+          </button>
         </div>
       </header>
     </div>
