@@ -6,13 +6,14 @@
 import { draw } from './deck.js';
 import { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
 import { isPit } from './board.js';
-import { raycast } from './lasers.js';
+import { listLaserHits } from './lasers.js';
 import { addDamage, rebootRobot, drawForSpam, SPAM_CARDS_PER_HIT } from './damage.js';
 import { cardToAction, CARD_TYPES } from './cards.js';
 import { applyMove } from './gameState.js';
 import { sortRobotsByPriority } from './priority.js';
 
-const MAX_DAMAGE = 9;
+/** Max damage tokens (matches draw cap 9 − damage). */
+export const MAX_DAMAGE = 9;
 
 /**
  * Locked high registers (last N) keep last round's cards when damage > 0 and registers are full.
@@ -133,13 +134,21 @@ function getCardForRegister(registers, registerIndex) {
  */
 
 /**
+ * @typedef {Object} ActivationLaserEvent
+ * @property {'laser_hit'} kind
+ * @property {number} registerIndex
+ * @property {string} shooterId
+ * @property {string} targetId
+ */
+
+/**
  * Execute one register for all robots in priority order; returns state and audit events.
  * @param {import('./types').GameState} state
  * @param {number} registerIndex
- * @returns {{ state: import('./types').GameState, events: (ActivationRobotEvent|ActivationBoardEvent)[] }}
+ * @returns {{ state: import('./types').GameState, events: (ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent)[] }}
  */
 export function activateRegisterWithEvents(state, registerIndex) {
-  /** @type {(ActivationRobotEvent|ActivationBoardEvent)[]} */
+  /** @type {(ActivationRobotEvent|ActivationLaserEvent|ActivationBoardEvent)[]} */
   const events = [];
   if (!state.antenna) return { state, events };
 
@@ -191,11 +200,20 @@ export function activateRegisterWithEvents(state, registerIndex) {
     });
   }
 
-  s = resolveBoardElements(s, registerIndex);
+  const boardResult = resolveBoardElements(s, registerIndex);
+  s = boardResult.state;
+  for (const hit of boardResult.laserHits) {
+    events.push({
+      kind: 'laser_hit',
+      registerIndex,
+      shooterId: hit.shooterId,
+      targetId: hit.targetId,
+    });
+  }
   events.push({
     kind: 'board_resolve',
     registerIndex,
-    details: 'conveyors, gears, push panels, pits, lasers, checkpoints',
+    details: 'conveyors, gears, push panels, pits, checkpoints',
   });
 
   return { state: s, events };
@@ -215,10 +233,12 @@ export function activateRegister(state, registerIndex) {
  * Board elements: conveyors, gears, push panels, pits, lasers, checkpoints.
  * @param {import('./types').GameState} state
  * @param {number} registerIndex
- * @returns {import('./types').GameState}
+ * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
  */
 function resolveBoardElements(state, registerIndex) {
   let s = state;
+  /** @type { { shooterId: string, targetId: string }[] } */
+  let laserHits = [];
 
   const cellToRobotId = () => {
     const m = new Map();
@@ -252,10 +272,12 @@ function resolveBoardElements(state, registerIndex) {
   applyUpdates(panelUpdates, ['col', 'row']);
 
   s = applyPits(s);
-  s = applyRobotLasers(s);
+  const laserResult = applyRobotLasers(s);
+  s = laserResult.state;
+  laserHits = laserResult.laserHits;
   s = applyCheckpoints(s);
 
-  return s;
+  return { state: s, laserHits };
 }
 
 function applyPits(state) {
@@ -272,21 +294,23 @@ function applyPits(state) {
   return { ...state, robots };
 }
 
+/**
+ * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
+ */
 function applyRobotLasers(state) {
+  const laserHits = listLaserHits(state.board, state.robots);
+  if (laserHits.length === 0) return { state, laserHits: [] };
   const damaged = new Map();
-  for (const robot of state.robots) {
-    if (robot.rebooted) continue;
-    const hit = raycast(state.board, state.robots, robot.col, robot.row, robot.direction, robot.id);
-    if (hit) damaged.set(hit.id, (damaged.get(hit.id) ?? 0) + 1);
+  for (const h of laserHits) {
+    damaged.set(h.targetId, (damaged.get(h.targetId) ?? 0) + 1);
   }
-  if (damaged.size === 0) return state;
   const robots = state.robots.map((r) => {
     const count = damaged.get(r.id);
     if (!count) return r;
     const nextDamage = Math.min(MAX_DAMAGE, (r.damage ?? 0) + count);
     return addDamage({ ...r, damage: nextDamage }, count * SPAM_CARDS_PER_HIT);
   });
-  return { ...state, robots };
+  return { state: { ...state, robots }, laserHits };
 }
 
 function applyCheckpoints(state) {

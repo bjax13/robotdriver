@@ -8,6 +8,7 @@ import {
   drawCheckpoints,
   drawGrid,
   drawRobot,
+  drawLaserBeams,
   drawSpawnMarkers,
   drawStartSlotLabels,
   drawWalls,
@@ -32,6 +33,7 @@ import {
   pickProgram,
   getUnlockedRegisterCount,
   getHandDrawCount,
+  MAX_DAMAGE,
 } from "./engine";
 
 const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
@@ -113,6 +115,31 @@ const ACTION_LABELS = {
  * Same triangle rendering as the board, for labels and the event log.
  * @param {{ colorIndex: number, size?: number }} props
  */
+function DamagePips({ damage, maxDamage }) {
+  const d = Math.min(Math.max(damage ?? 0, 0), maxDamage);
+  return (
+    <span
+      style={{ display: "inline-flex", gap: 3, alignItems: "center" }}
+      role="img"
+      aria-label={`Damage ${d} of ${maxDamage}`}
+    >
+      {Array.from({ length: maxDamage }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 2,
+            background: i < d ? "#dc2626" : "#e2e8f0",
+            boxSizing: "border-box",
+            border: "1px solid #cbd5e1",
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function RobotSwatch({ colorIndex, size = 26 }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
@@ -328,6 +355,7 @@ function App() {
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     drawSpawnMarkers(context, displayState.robots, CELL_SIZE);
+    drawLaserBeams(context, displayState.board, displayState.robots, CELL_SIZE);
     displayState.robots.forEach((robot, index) => {
       const { x, y } = toPixelCenter(robot.col, robot.row, CELL_SIZE);
       drawRobot(context, x, y, HALF_CELL_SIZE, robot.direction, index);
@@ -499,6 +527,35 @@ function App() {
                       {ACTION_LABELS[entry.action] || entry.action}
                     </>
                   )}
+                  {entry.kind === "laser_hit" && (
+                    <>
+                      {" "}
+                      · Laser{" "}
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          flexWrap: "wrap",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        <RobotSwatch
+                          colorIndex={getRobotColorIndex(gameState.robots, entry.shooterId)}
+                          size={20}
+                        />
+                        <span>{getRobotDisplayLabel(gameState.robots, entry.shooterId)}</span>
+                        <span aria-hidden>→</span>
+                        <RobotSwatch
+                          colorIndex={getRobotColorIndex(gameState.robots, entry.targetId)}
+                          size={20}
+                        />
+                        <span>{getRobotDisplayLabel(gameState.robots, entry.targetId)}</span>
+                      </span>
+                      {" "}
+                      (+1 damage)
+                    </>
+                  )}
                   {entry.kind === "board_resolve" && (
                     <> · board: {entry.details}</>
                   )}
@@ -534,6 +591,30 @@ function App() {
               <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={24} />
               {r.id}
             </button>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            padding: "0 8px 8px",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#475569", marginRight: 4 }}>Damage:</span>
+          {displayState.robots.map((r) => (
+            <div
+              key={r.id}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              <RobotSwatch colorIndex={getRobotColorIndex(gameState.robots, r.id)} size={20} />
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{r.id}</span>
+              <DamagePips damage={r.damage} maxDamage={MAX_DAMAGE} />
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                {Math.min(r.damage ?? 0, MAX_DAMAGE)}/{MAX_DAMAGE}
+              </span>
+            </div>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8 }}>
@@ -631,7 +712,8 @@ function App() {
         )}
         <div style={{ padding: 8 }}>
           <span style={{ marginRight: 8 }}>
-            Registers ({selectedRobotId}) — damage {selectedRobot?.damage ?? 0}, draw {handDrawCount},{" "}
+            Registers ({selectedRobotId}) — damage {selectedRobot?.damage ?? 0}/{MAX_DAMAGE}, draw{" "}
+            {handDrawCount},{" "}
             {unlockedSlots} unlocked:
           </span>
           {program.map((c, i) => (
