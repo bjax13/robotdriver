@@ -5,8 +5,10 @@ import {
   CANVAS_WIDTH,
   CELL_SIZE,
   HALF_CELL_SIZE,
+  drawCheckpoints,
   drawGrid,
   drawRobot,
+  drawStartSlotLabels,
   drawWalls,
 } from "./App.utils";
 import {
@@ -20,12 +22,19 @@ import {
   activateRound,
   activateRegisterWithEvents,
   CARD_TYPES,
+  mulberry32,
+  placeRandomCheckpoints,
+  chooseInitialFacing,
+  slotToCell,
 } from "./engine";
 
 const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
 const GRID_ROWS = CANVAS_HEIGHT / CELL_SIZE;
 
-const initialBoard = createBoard(GRID_COLS, GRID_ROWS, [
+/** Seeded placement for the three flags (checkpoints). */
+const DEMO_BOARD_SEED = 0xbad5eed;
+
+const DEMO_WALLS = [
   { col: 0, row: 0, edge: "E" },
   { col: 0, row: 1, edge: "E" },
   { col: 0, row: 2, edge: "E" },
@@ -35,15 +44,38 @@ const initialBoard = createBoard(GRID_COLS, GRID_ROWS, [
   { col: 2, row: 2, edge: "N" },
   { col: 3, row: 2, edge: "N" },
   { col: 4, row: 2, edge: "N" },
-]);
+];
+
+function buildDemoBoardAndRobots() {
+  const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS);
+  const excludeCells = new Set(["0,0", "2,0", "4,0"]);
+  const rand = mulberry32(DEMO_BOARD_SEED >>> 0);
+  placeRandomCheckpoints(board, 3, rand, {
+    excludeCells,
+    excludeStartRow: true,
+  });
+
+  const cp0 = board.checkpoints[0];
+  const robotSpecs = [1, 2, 3].map((slotNum) => {
+    const cell = slotToCell(board, slotNum);
+    if (!cell) {
+      throw new Error(`Invalid start slot ${slotNum} for board width ${board.width}`);
+    }
+    return {
+      col: cell.col,
+      row: cell.row,
+      direction: chooseInitialFacing(board, cell.col, cell.row, cp0.col, cp0.row),
+    };
+  });
+
+  return { board, robotSpecs };
+}
+
+const { board: initialBoard, robotSpecs: initialRobotSpecs } = buildDemoBoardAndRobots();
 
 const initialState = createInitialState({
   board: initialBoard,
-  robots: [
-    { col: 0, row: 0, direction: 90 },
-    { col: 1, row: 0, direction: 90 },
-    { col: 2, row: 0, direction: 180 },
-  ],
+  robots: initialRobotSpecs,
   antenna: { col: 5, row: 5 },
 });
 
@@ -74,15 +106,6 @@ function gameReducer(state, action) {
     default:
       return state;
   }
-}
-
-function mulberry32(seed) {
-  return function random() {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function hashStringToSeed(s) {
@@ -261,6 +284,8 @@ function App() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
+    drawCheckpoints(context, displayState.board, CELL_SIZE);
+    drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     displayState.robots.forEach((robot, index) => {
       const { x, y } = toPixelCenter(robot.col, robot.row, CELL_SIZE);
       drawRobot(context, x, y, HALF_CELL_SIZE, robot.direction, index);

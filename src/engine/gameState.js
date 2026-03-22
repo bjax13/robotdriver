@@ -102,6 +102,7 @@ export function createInitialState(options = {}) {
     col: spec.col,
     row: spec.row,
     direction: spec.direction ?? 90,
+    nextCheckpoint: 0,
     deck: createDeck(),
     discard: [],
     hand: [],
