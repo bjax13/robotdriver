@@ -6,6 +6,7 @@ import {
   CELL_SIZE,
   HALF_CELL_SIZE,
   drawCheckpoints,
+  drawGears,
   drawGrid,
   drawRobot,
   drawLaserBeams,
@@ -444,6 +445,7 @@ function App() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
+    drawGears(context, displayState.board, CELL_SIZE);
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     drawSpawnMarkers(context, displayState.robots, CELL_SIZE);

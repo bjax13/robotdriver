@@ -120,6 +120,72 @@ export function drawWalls(context, walls) {
  * @param {{ width: number, height: number, checkpoints?: { col: number, row: number }[] }} board
  * @param {number} cellSize
  */
+/**
+ * Left (L) / right (R) gears: robots on the cell rotate 90° CCW / CW after each register.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, gears?: Record<string, 'L'|'R'> }} board
+ * @param {number} cellSize
+ */
+export function drawGears(context, board, cellSize) {
+  const gears = board.gears;
+  if (!gears) return;
+
+  const half = cellSize / 2;
+  const radius = Math.max(6, cellSize * 0.24);
+
+  for (const [key, type] of Object.entries(gears)) {
+    if (type !== "L" && type !== "R") continue;
+    const [col, row] = key.split(",").map(Number);
+    if (col < 0 || row < 0 || col >= board.width || row >= board.height) continue;
+
+    const cx = col * cellSize + half;
+    const cy = row * cellSize + half;
+    const isL = type === "L";
+
+    context.save();
+    context.translate(cx, cy);
+
+    context.fillStyle = isL ? "rgba(185, 28, 28, 0.18)" : "rgba(22, 163, 74, 0.18)";
+    context.beginPath();
+    context.arc(0, 0, radius + 2, 0, Math.PI * 2);
+    context.fill();
+
+    const start = isL ? Math.PI * 0.65 : Math.PI * 0.35;
+    const end = isL ? Math.PI * 1.35 : -Math.PI * 0.35;
+    context.strokeStyle = isL ? "#991b1b" : "#166534";
+    context.lineWidth = 2.5;
+    context.lineCap = "round";
+    context.beginPath();
+    context.arc(0, 0, radius, start, end, false);
+    context.stroke();
+
+    const prevAngle = isL ? end - 0.15 : end + 0.15;
+    const tipX = radius * Math.cos(end);
+    const tipY = radius * Math.sin(end);
+    const px = radius * Math.cos(prevAngle);
+    const py = radius * Math.sin(prevAngle);
+    const dx = tipX - px;
+    const dy = tipY - py;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const perpX = -uy;
+    const perpY = ux;
+    const wing = Math.max(3, cellSize * 0.12);
+    const back = Math.max(4, cellSize * 0.16);
+
+    context.beginPath();
+    context.moveTo(tipX, tipY);
+    context.lineTo(tipX - ux * back + perpX * wing, tipY - uy * back + perpY * wing);
+    context.lineTo(tipX - ux * back - perpX * wing, tipY - uy * back - perpY * wing);
+    context.closePath();
+    context.fillStyle = isL ? "#991b1b" : "#166534";
+    context.fill();
+
+    context.restore();
+  }
+}
+
 export function drawCheckpoints(context, board, cellSize) {
   const cps = board.checkpoints;
   if (!cps?.length) return;
