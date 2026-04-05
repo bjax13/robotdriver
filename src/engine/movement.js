@@ -3,8 +3,9 @@
  * Supports pushing: moving into occupied cell pushes chain; wall/OOB stops all.
  */
 
-import { inBounds, hasWall, isConveyor } from './board.js';
+import { inBounds, isConveyor } from './board.js';
 import { getPushChain, canPushChain, applyPush } from './push.js';
+import { getPassabilityForRobot, wallBlocks } from './movementPassability.js';
 
 /**
  * Get (col, row) delta for one step in the given direction.
@@ -54,13 +55,22 @@ function cellToRobotMapWithUpdates(robots, updates) {
  * @param {import('./types').Robot} robot
  * @param {Set<string>} occupiedOthers - "col,row" keys for other robots
  * @param {number} steps
+ * @param {(r: import('./types').Robot) => Object|undefined} [resolvePassability]
  * @returns {boolean}
  */
-export function forwardMoveWouldEnterOccupied(board, robot, occupiedOthers, steps) {
+export function forwardMoveWouldEnterOccupied(
+  board,
+  robot,
+  occupiedOthers,
+  steps,
+  resolvePassability = getPassabilityForRobot,
+) {
   let { col, row, direction } = robot;
+  const actor = robot;
+  const pass = resolvePassability(actor);
   const { dCol, dRow } = directionDelta(direction);
   for (let i = 0; i < steps; i++) {
-    if (hasWall(board, col, row, direction)) break;
+    if (wallBlocks(board, col, row, direction, actor, pass)) break;
     const nc = col + dCol;
     const nr = row + dRow;
     if (!inBounds(board, nc, nr)) break;
@@ -75,15 +85,21 @@ export function forwardMoveWouldEnterOccupied(board, robot, occupiedOthers, step
  * @param {import('./types').Board} board
  * @param {import('./types').Robot} robot
  * @param {Set<string>} occupiedOthers
+ * @param {(r: import('./types').Robot) => Object|undefined} [resolvePassability]
  * @returns {boolean}
  */
-export function backwardMoveWouldEnterOccupied(board, robot, occupiedOthers) {
+export function backwardMoveWouldEnterOccupied(
+  board,
+  robot,
+  occupiedOthers,
+  resolvePassability = getPassabilityForRobot,
+) {
   const virtualDir = (robot.direction + 180) % 360;
   const virtual = { ...robot, direction: virtualDir };
-  return forwardMoveWouldEnterOccupied(board, virtual, occupiedOthers, 1);
+  return forwardMoveWouldEnterOccupied(board, virtual, occupiedOthers, 1, resolvePassability);
 }
 
-export function stepForwardWithPush(board, robot, allRobots, steps) {
+export function stepForwardWithPush(board, robot, allRobots, steps, resolvePassability = getPassabilityForRobot) {
   const updates = new Map();
   let col = robot.col;
   let row = robot.row;
@@ -91,7 +107,7 @@ export function stepForwardWithPush(board, robot, allRobots, steps) {
   const { dCol, dRow } = directionDelta(direction);
 
   for (let s = 0; s < steps; s++) {
-    if (hasWall(board, col, row, direction)) break;
+    if (wallBlocks(board, col, row, direction, robot, resolvePassability(robot))) break;
     const nextCol = col + dCol;
     const nextRow = row + dRow;
     if (!inBounds(board, nextCol, nextRow)) break;
@@ -105,7 +121,7 @@ export function stepForwardWithPush(board, robot, allRobots, steps) {
         break;
       }
       const chain = getPushChain(cellMap, nextCol, nextRow, direction);
-      const { canPush } = canPushChain(board, chain, direction);
+      const { canPush } = canPushChain(board, chain, direction, resolvePassability);
       if (!canPush) break;
       const pushUpdates = applyPush(chain, direction);
       for (const [id, pos] of pushUpdates) {
@@ -130,14 +146,25 @@ export function stepForwardWithPush(board, robot, allRobots, steps) {
  * @param {import('./types').Robot} robot
  * @param {Set<string>} occupied - Set of "col,row" for cells occupied by other robots
  * @param {number} steps - 1, 2, or 3
+ * @param {(r: import('./types').Robot) => Object|undefined} [resolvePassability]
+ * @param {import('./types').Robot} [passabilityActor] - robot whose traits apply (defaults to robot; use real robot when geometry uses a virtual)
  * @returns {{ col: number, row: number, direction: number }}
  */
-export function stepForward(board, robot, occupied, steps) {
+export function stepForward(
+  board,
+  robot,
+  occupied,
+  steps,
+  resolvePassability = getPassabilityForRobot,
+  passabilityActor,
+) {
+  const actor = passabilityActor ?? robot;
+  const pass = resolvePassability(actor);
   let { col, row, direction } = robot;
   const { dCol, dRow } = directionDelta(direction);
 
   for (let i = 0; i < steps; i++) {
-    if (hasWall(board, col, row, direction)) break;
+    if (wallBlocks(board, col, row, direction, actor, pass)) break;
     const nextCol = col + dCol;
     const nextRow = row + dRow;
     if (!inBounds(board, nextCol, nextRow)) break;
@@ -156,12 +183,13 @@ export function stepForward(board, robot, occupied, steps) {
  * @param {import('./types').Board} board
  * @param {import('./types').Robot} robot
  * @param {Set<string>} occupied
+ * @param {(r: import('./types').Robot) => Object|undefined} [resolvePassability]
  * @returns {{ col: number, row: number, direction: number }}
  */
-export function stepBackward(board, robot, occupied) {
+export function stepBackward(board, robot, occupied, resolvePassability = getPassabilityForRobot) {
   const oppositeDir = (robot.direction + 180) % 360;
   const virtual = { ...robot, direction: oppositeDir };
-  const result = stepForward(board, virtual, occupied, 1);
+  const result = stepForward(board, virtual, occupied, 1, resolvePassability, robot);
   return { ...result, direction: robot.direction };
 }
 

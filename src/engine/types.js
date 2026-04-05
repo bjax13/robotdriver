@@ -51,6 +51,7 @@
  * @property {number} [spawnRow]
  * @property {number} [damage] - damage tokens (smaller hand; locks high registers)
  * @property {boolean} [powerDownThisRound] - skip program execution this activation; heal to 0 damage after register 5
+ * @property {boolean} [wallPhasing] - when true with energy ≥ 1, movement ignores walls (see movementPassability.js)
  */
 
 /**

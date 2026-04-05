@@ -97,7 +97,7 @@ export function applyMove(state, robotId, action) {
  * @param {number} [options.width=10]
  * @param {number} [options.height=10]
  * @param {{ col: number, row: number }} [options.antenna]
- * @param {{ col: number, row: number, direction?: number, damage?: number }[]} [options.robots]
+ * @param {{ col: number, row: number, direction?: number, damage?: number, energy?: number, wallPhasing?: boolean }[]} [options.robots]
  * @param {number} [options.robotDeckSeedBase] - if set, each robot deck uses createDeck(base + index)
  * @returns {import('./types').GameState}
  */
@@ -124,7 +124,8 @@ export function createInitialState(options = {}) {
     discard: [],
     hand: [],
     registers: [],
-    energy: 0,
+    energy: spec.energy ?? 0,
+    ...(spec.wallPhasing ? { wallPhasing: true } : {}),
   }));
 
   return {

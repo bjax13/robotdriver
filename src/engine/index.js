@@ -1,6 +1,14 @@
 export { DIRECTIONS } from './types.js';
 export { createBoard, inBounds, hasWall, wallKey, isConveyor } from './board.js';
-export { stepForward, stepBackward, stepForwardWithPush, turn, directionDelta } from './movement.js';
+export {
+  stepForward,
+  stepBackward,
+  stepForwardWithPush,
+  turn,
+  directionDelta,
+  forwardMoveWouldEnterOccupied,
+} from './movement.js';
+export { wallBlocks, getPassabilityForRobot } from './movementPassability.js';
 export { sortRobotsByPriority, distanceToAntenna } from './priority.js';
 export { toPixelCenter, boardToWallSegments } from './canvasAdapter.js';
 export { applyMove, getOccupiedCells, createInitialState } from './gameState.js';

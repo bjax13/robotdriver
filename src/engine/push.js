@@ -3,8 +3,9 @@
  * Chain pushes one space each; wall or off-board stops entire push.
  */
 
-import { inBounds, hasWall } from './board.js';
+import { inBounds } from './board.js';
 import { directionDelta } from './movement.js';
+import { getPassabilityForRobot, wallBlocks } from './movementPassability.js';
 
 /**
  * Build chain of robots from (startCol, startRow) going in direction.
@@ -35,16 +36,18 @@ export function getPushChain(cellToRobot, startCol, startRow, direction) {
  * @param {import('./types').Board} board
  * @param {import('./types').Robot[]} chain
  * @param {number} direction
+ * @param {(robot: import('./types').Robot) => Object|undefined} [resolvePassability] - returns MovementPassability or undefined; default getPassabilityForRobot
  * @returns {{ canPush: boolean, frontCol?: number, frontRow?: number }}
  */
-export function canPushChain(board, chain, direction) {
+export function canPushChain(board, chain, direction, resolvePassability = getPassabilityForRobot) {
   if (chain.length === 0) return { canPush: true };
   const { dCol, dRow } = directionDelta(direction);
   const front = chain[chain.length - 1];
   const frontCol = front.col + dCol;
   const frontRow = front.row + dRow;
   if (!inBounds(board, frontCol, frontRow)) return { canPush: false };
-  if (hasWall(board, front.col, front.row, direction)) return { canPush: false };
+  const pass = resolvePassability(front);
+  if (wallBlocks(board, front.col, front.row, direction, front, pass)) return { canPush: false };
   return { canPush: true, frontCol, frontRow };
 }
 

@@ -1,6 +1,7 @@
 import { createBoard } from '../board.js';
 import { createInitialState, applyMove } from '../gameState.js';
 import { forwardMoveWouldEnterOccupied, stepForward, stepForwardWithPush } from '../movement.js';
+import { wallEastOf } from '../testFixtures.js';
 
 describe('wall and path parity (push only when entering occupied)', () => {
   it('forwardMoveWouldEnterOccupied is false when path is clear', () => {
@@ -61,5 +62,36 @@ describe('wall and path parity (push only when entering occupied)', () => {
     const b = applyMove(multi, 'r1', 'move2').robots[0];
     expect(a.col).toBe(b.col);
     expect(a.row).toBe(b.row);
+  });
+
+  describe('wall phasing parity (per-robot passability)', () => {
+    it('applyMove solo vs multi matches when phased robot crosses a wall', () => {
+      const board = createBoard(10, 10, wallEastOf(1, 2));
+      const attrs = {
+        col: 1,
+        row: 2,
+        direction: 90,
+        energy: 1,
+        wallPhasing: true,
+      };
+      const solo = createInitialState({
+        board,
+        robots: [{ ...attrs }],
+        antenna: { col: 0, row: 0 },
+      });
+      const multi = createInitialState({
+        board,
+        robots: [{ ...attrs }, { col: 9, row: 9, direction: 0 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const a = applyMove(solo, 'r1', 'move2').robots[0];
+      const b = applyMove(multi, 'r1', 'move2').robots[0];
+      expect({ col: a.col, row: a.row, direction: a.direction }).toEqual({
+        col: b.col,
+        row: b.row,
+        direction: b.direction,
+      });
+      expect(a.col).toBe(3);
+    });
   });
 });
