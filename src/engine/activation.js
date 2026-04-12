@@ -4,16 +4,13 @@
  */
 
 import { draw } from './deck.js';
-import { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
-import { isPit } from './board.js';
-import { listAllLaserHits } from './lasers.js';
-import { addDamage, rebootRobot, drawForSpam, SPAM_CARDS_PER_HIT } from './damage.js';
+import { drawForSpam, MAX_DAMAGE } from './damage.js';
 import { cardToAction, CARD_TYPES } from './cards.js';
 import { applyMove } from './gameState.js';
 import { sortRobotsByPriority } from './priority.js';
+import { runPostRegisterBoardElements } from './postRegisterBoard.js';
 
-/** Max damage tokens (matches draw cap 9 − damage). */
-export const MAX_DAMAGE = 9;
+export { MAX_DAMAGE } from './damage.js';
 
 /**
  * Autoplay: probability of choosing power down at damage d (d>=1).
@@ -247,7 +244,7 @@ export function activateRegisterWithEvents(state, registerIndex) {
     });
   }
 
-  const boardResult = resolveBoardElements(s, registerIndex);
+  const boardResult = runPostRegisterBoardElements(s, registerIndex);
   s = boardResult.state;
   for (const hit of boardResult.laserHits) {
     events.push({
@@ -298,111 +295,6 @@ export function activateRegisterWithEvents(state, registerIndex) {
  */
 export function activateRegister(state, registerIndex) {
   return activateRegisterWithEvents(state, registerIndex).state;
-}
-
-/**
- * Board elements: conveyors, gears, push panels, pits, lasers, checkpoints.
- * @param {import('./types').GameState} state
- * @param {number} registerIndex
- * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
- */
-function resolveBoardElements(state, registerIndex) {
-  let s = state;
-  /** @type { { shooterId: string, targetId: string }[] } */
-  let laserHits = [];
-
-  const cellToRobotId = () => {
-    const m = new Map();
-    for (const r of s.robots) {
-      if (r.rebooted) continue;
-      m.set(`${r.col},${r.row}`, r.id);
-    }
-    return m;
-  };
-
-  const applyUpdates = (updates, keys = ['col', 'row', 'direction']) => {
-    if (updates.size === 0) return;
-    const robots = s.robots.map((r) => {
-      const u = updates.get(r.id);
-      if (!u) return r;
-      const next = { ...r };
-      for (const k of keys) if (u[k] !== undefined) next[k] = u[k];
-      return next;
-    });
-    s = { ...s, robots };
-  };
-
-  s = applyPits(s);
-  const { updates: convUpdates } = resolveConveyors(s, cellToRobotId());
-  applyUpdates(convUpdates, ['col', 'row']);
-
-  const gearUpdates = resolveGears(s);
-  applyUpdates(gearUpdates, ['direction']);
-
-  const panelUpdates = resolvePushPanels(s, registerIndex);
-  applyUpdates(panelUpdates, ['col', 'row']);
-
-  s = applyPits(s);
-  const laserResult = applyRobotLasers(s);
-  s = laserResult.state;
-  laserHits = laserResult.laserHits;
-  s = applyCheckpoints(s);
-
-  return { state: s, laserHits };
-}
-
-function applyPits(state) {
-  if (!state.board.pits) return state;
-  const fallbackCol = state.board.rebootCol ?? 0;
-  const fallbackRow = state.board.rebootRow ?? 0;
-  const robots = state.robots.map((r) => {
-    if (r.rebooted) return r;
-    if (!isPit(state.board, r.col, r.row)) return r;
-    const rc = r.spawnCol ?? fallbackCol;
-    const rr = r.spawnRow ?? fallbackRow;
-    return rebootRobot(r, rc, rr, 1);
-  });
-  return { ...state, robots };
-}
-
-/**
- * @returns {{ state: import('./types').GameState, laserHits: { shooterId: string, targetId: string }[] }}
- */
-function applyRobotLasers(state) {
-  const laserHits = listAllLaserHits(state.board, state.robots, state.antenna);
-  if (laserHits.length === 0) return { state, laserHits: [] };
-  const damaged = new Map();
-  for (const h of laserHits) {
-    damaged.set(h.targetId, (damaged.get(h.targetId) ?? 0) + 1);
-  }
-  const robots = state.robots.map((r) => {
-    const count = damaged.get(r.id);
-    if (!count) return r;
-    const nextDamage = Math.min(MAX_DAMAGE, (r.damage ?? 0) + count);
-    return addDamage({ ...r, damage: nextDamage }, count * SPAM_CARDS_PER_HIT);
-  });
-  return { state: { ...state, robots }, laserHits };
-}
-
-function applyCheckpoints(state) {
-  if (!state.board.checkpoints) return state;
-  const robots = state.robots.map((r) => {
-    if (r.rebooted) return r;
-    const nextCp = (r.nextCheckpoint ?? 0);
-    const cp = state.board.checkpoints[nextCp];
-    if (!cp) return r;
-    if (r.col === cp.col && r.row === cp.row) {
-      return {
-        ...r,
-        nextCheckpoint: nextCp + 1,
-        spawnCol: cp.col,
-        spawnRow: cp.row,
-      };
-    }
-    return r;
-  });
-  const winner = robots.find((r) => r.nextCheckpoint >= (state.board.checkpoints?.length ?? 0));
-  return { ...state, robots, winner: winner?.id };
 }
 
 /**

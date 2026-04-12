@@ -7,6 +7,9 @@ import { shuffle } from './deck.js';
 
 export const SPAM_CARDS_PER_HIT = 1;
 
+/** Max damage tokens (matches draw cap 9 − damage). */
+export const MAX_DAMAGE = 9;
+
 /**
  * Add SPAM damage to robot's discard. These get shuffled into deck when drawing.
  * @param {import('./types').Robot} robot

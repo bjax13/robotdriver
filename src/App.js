@@ -6,11 +6,14 @@ import {
   CELL_SIZE,
   HALF_CELL_SIZE,
   drawCheckpoints,
+  drawConveyors,
   drawGears,
   drawGrid,
   drawRobot,
   drawLaserBeams,
   drawBoardLaserEmitters,
+  drawPushPanels,
+  drawPriorityAntenna,
   drawSpawnMarkers,
   drawStartSlotLabels,
   drawWalls,
@@ -33,6 +36,9 @@ import {
   chooseInitialFacing,
   slotToCell,
   pickProgram,
+  runPostRegisterBoardElements,
+  runBoardElementStep,
+  POST_REGISTER_STEPS,
   getUnlockedRegisterCount,
   getHandDrawCount,
   MAX_DAMAGE,
@@ -63,12 +69,20 @@ const DEMO_BOARD_LASERS = [{ col: 9, row: 0, direction: 270 }];
 
 function buildDemoBoardAndRobots() {
   const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS, DEMO_BOARD_LASERS);
-  const excludeCells = new Set(["0,0", "2,0", "4,0"]);
+  const demoElementCells = ["6,8", "7,8", "8,8", "5,5", "6,5", "4,4"];
+  const excludeCells = new Set(["0,0", "2,0", "4,0", ...demoElementCells]);
   const rand = mulberry32(DEMO_BOARD_SEED >>> 0);
   placeRandomCheckpoints(board, 3, rand, {
     excludeCells,
     excludeStartRow: true,
   });
+
+  board.gears = { "6,8": "L", "7,8": "R" };
+  board.conveyors = {
+    "5,5": { direction: 90, express: false },
+    "6,5": { direction: 0, express: true },
+  };
+  board.pushPanels = { "4,4": { registers: [1], direction: 90 } };
 
   const cp0 = board.checkpoints[0];
   const robotSpecs = [1, 2, 3].map((slotNum) => {
@@ -116,6 +130,17 @@ const ACTION_LABELS = {
   uturn: "U-turn",
   back: "Back up",
   powerUp: "Power up",
+};
+
+/** Labels for manual post-register board tests (same order as engine). */
+const DEV_BOARD_STEP_LABELS = {
+  pits_pre: "Pits (pre)",
+  conveyors: "Conveyors",
+  gears: "Gears",
+  push_panels: "Push panels",
+  pits_post: "Pits (post)",
+  lasers: "Lasers",
+  checkpoints: "Checkpoints",
 };
 
 /**
@@ -292,6 +317,7 @@ function App() {
   const [autoPowerDownBots, setAutoPowerDownBots] = useState(true);
   const [autoStepMs, setAutoStepMs] = useState(800);
   const [dismissedWinnerId, setDismissedWinnerId] = useState(null);
+  const [devBoardRegister, setDevBoardRegister] = useState(0);
   const wrapHandledSessionRef = useRef(null);
   const autoplayRngMixRef = useRef(1);
 
@@ -326,6 +352,27 @@ function App() {
     setActivationSession(null);
     if (!preserveAutoStep) setAutoStep(false);
   }, []);
+
+  const applyDevBoardState = useCallback(
+    (next) => {
+      clearActivationSession();
+      dispatch({ type: "MERGE_STATE", payload: next });
+    },
+    [clearActivationSession]
+  );
+
+  const runDevBoardStep = useCallback(
+    (step) => {
+      const next = runBoardElementStep(gameState, devBoardRegister, step).state;
+      applyDevBoardState(next);
+    },
+    [gameState, devBoardRegister, applyDevBoardState]
+  );
+
+  const runDevBoardAll = useCallback(() => {
+    const next = runPostRegisterBoardElements(gameState, devBoardRegister).state;
+    applyDevBoardState(next);
+  }, [gameState, devBoardRegister, applyDevBoardState]);
 
   const goNextRegister = useCallback(() => {
     setActivationSession((session) => {
@@ -445,10 +492,13 @@ function App() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
+    drawConveyors(context, displayState.board, CELL_SIZE);
     drawGears(context, displayState.board, CELL_SIZE);
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
     drawSpawnMarkers(context, displayState.robots, CELL_SIZE);
+    drawPushPanels(context, displayState.board, CELL_SIZE);
+    drawPriorityAntenna(context, displayState.antenna, CELL_SIZE);
     drawLaserBeams(context, displayState.board, displayState.robots, CELL_SIZE, displayState.antenna);
     drawBoardLaserEmitters(context, displayState.board, CELL_SIZE);
     displayState.robots.forEach((robot, index) => {
@@ -956,6 +1006,46 @@ function App() {
               style={{ width: 72 }}
             />
           </label>
+        </div>
+        <div
+          style={{
+            border: "1px solid #334155",
+            borderRadius: 8,
+            padding: 10,
+            margin: "0 8px 8px",
+            background: "rgba(15, 23, 42, 0.35)",
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+            Board elements (dev)
+          </div>
+          <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 8px 0" }}>
+            Runs factory resolution on current game state (pits/lasers change robots like a register
+            tick). Push panels use the register index below.
+          </p>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            Register index for push panels (0–4)
+            <input
+              type="number"
+              min={0}
+              max={4}
+              value={devBoardRegister}
+              onChange={(e) =>
+                setDevBoardRegister(Math.min(4, Math.max(0, Number(e.target.value) || 0)))
+              }
+              style={{ width: 48 }}
+            />
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {POST_REGISTER_STEPS.map((step) => (
+              <button key={step} type="button" onClick={() => runDevBoardStep(step)}>
+                {DEV_BOARD_STEP_LABELS[step] ?? step}
+              </button>
+            ))}
+            <button type="button" onClick={runDevBoardAll} style={{ fontWeight: 600 }}>
+              Run all (engine order)
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: 8, alignItems: "center" }}>
           <input

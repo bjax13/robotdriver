@@ -116,6 +116,169 @@ export function drawWalls(context, walls) {
 }
 
 /**
+ * Unit vector for board direction (0=N, 90=E) in canvas coords (y down).
+ * @param {number} directionDeg
+ * @returns {{ ux: number, uy: number }}
+ */
+function boardDirectionUnit(directionDeg) {
+  const rad = (Math.PI / 180) * directionDeg;
+  return { ux: Math.sin(rad), uy: -Math.cos(rad) };
+}
+
+/**
+ * @param {CanvasRenderingContext2D} context
+ * @param {number} cx
+ * @param {number} cy
+ * @param {{ ux: number, uy: number }} forward
+ * @param {{ ux: number, uy: number }} perp
+ * @param {number} scale
+ */
+function drawBeltChevron(context, cx, cy, forward, perp, scale) {
+  const { ux, uy } = forward;
+  const tipX = cx + ux * scale;
+  const tipY = cy + uy * scale;
+  const wing = scale * 0.55;
+  context.beginPath();
+  context.moveTo(tipX, tipY);
+  context.lineTo(
+    cx + ux * scale * 0.2 + perp.ux * wing,
+    cy + uy * scale * 0.2 + perp.uy * wing
+  );
+  context.lineTo(
+    cx + ux * scale * 0.2 - perp.ux * wing,
+    cy + uy * scale * 0.2 - perp.uy * wing
+  );
+  context.closePath();
+  context.fill();
+}
+
+/**
+ * Standard and express conveyor belts (engine: direction 0–270, express = 2 steps).
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, conveyors?: Record<string, { direction: number, express?: boolean }> }} board
+ * @param {number} cellSize
+ */
+export function drawConveyors(context, board, cellSize) {
+  const conveyors = board.conveyors;
+  if (!conveyors) return;
+
+  const half = cellSize / 2;
+  const baseScale = Math.max(8, cellSize * 0.22);
+
+  for (const [key, conv] of Object.entries(conveyors)) {
+    const [col, row] = key.split(",").map(Number);
+    if (col < 0 || row < 0 || col >= board.width || row >= board.height) continue;
+
+    const cx = col * cellSize + half;
+    const cy = row * cellSize + half;
+    const forward = boardDirectionUnit(conv.direction);
+    const perp = { ux: -forward.uy, uy: forward.ux };
+    const express = !!conv.express;
+    const spacing = express ? baseScale * 0.45 : 0;
+
+    context.save();
+    context.fillStyle = express ? "rgba(234, 179, 8, 0.45)" : "rgba(100, 116, 139, 0.35)";
+    context.beginPath();
+    context.rect(
+      col * cellSize + 2,
+      row * cellSize + 2,
+      cellSize - 4,
+      cellSize - 4
+    );
+    context.fill();
+
+    context.fillStyle = express ? "#a16207" : "#475569";
+    if (express) {
+      drawBeltChevron(
+        context,
+        cx - perp.ux * spacing,
+        cy - perp.uy * spacing,
+        forward,
+        perp,
+        baseScale
+      );
+      drawBeltChevron(
+        context,
+        cx + perp.ux * spacing,
+        cy + perp.uy * spacing,
+        forward,
+        perp,
+        baseScale
+      );
+      context.fillStyle = "#92400e";
+      context.font = `bold ${Math.round(cellSize * 0.22)}px sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "bottom";
+      context.fillText("2×", cx, row * cellSize + cellSize - 3);
+    } else {
+      drawBeltChevron(context, cx, cy, forward, perp, baseScale);
+    }
+    context.restore();
+  }
+}
+
+/**
+ * Wall push panels: arrow in push direction; tiny register list.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, pushPanels?: Record<string, number[] | { registers: number[], direction?: number }> }} board
+ * @param {number} cellSize
+ */
+export function drawPushPanels(context, board, cellSize) {
+  const pushPanels = board.pushPanels;
+  if (!pushPanels) return;
+
+  const half = cellSize / 2;
+  const scale = Math.max(7, cellSize * 0.18);
+
+  for (const [key, config] of Object.entries(pushPanels)) {
+    const cfg = Array.isArray(config) ? { registers: config, direction: 180 } : config;
+    const [col, row] = key.split(",").map(Number);
+    if (col < 0 || row < 0 || col >= board.width || row >= board.height) continue;
+
+    const cx = col * cellSize + half;
+    const cy = row * cellSize + half;
+    const dir = cfg.direction ?? 180;
+    const forward = boardDirectionUnit(dir);
+    const perp = { ux: -forward.uy, uy: forward.ux };
+
+    context.save();
+    context.strokeStyle = "#7c3aed";
+    context.fillStyle = "rgba(124, 58, 237, 0.2)";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(cx, cy, scale * 1.1, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+
+    const tipX = cx + forward.ux * scale * 1.2;
+    const tipY = cy + forward.uy * scale * 1.2;
+    context.beginPath();
+    context.moveTo(tipX, tipY);
+    context.lineTo(
+      cx + forward.ux * scale * 0.2 + perp.ux * scale * 0.65,
+      cy + forward.uy * scale * 0.2 + perp.uy * scale * 0.65
+    );
+    context.lineTo(
+      cx + forward.ux * scale * 0.2 - perp.ux * scale * 0.65,
+      cy + forward.uy * scale * 0.2 - perp.uy * scale * 0.65
+    );
+    context.closePath();
+    context.fillStyle = "#6d28d9";
+    context.fill();
+
+    const regLabel = (cfg.registers ?? []).join(",");
+    if (regLabel) {
+      context.fillStyle = "#4c1d95";
+      context.font = `${Math.round(cellSize * 0.2)}px monospace`;
+      context.textAlign = "center";
+      context.textBaseline = "top";
+      context.fillText(`R${regLabel}`, cx, row * cellSize + 2);
+    }
+    context.restore();
+  }
+}
+
+/**
  * @param {CanvasRenderingContext2D} context
  * @param {{ width: number, height: number, checkpoints?: { col: number, row: number }[] }} board
  * @param {number} cellSize
@@ -241,6 +404,42 @@ export function drawSpawnMarkers(context, robots, cellSize) {
     context.closePath();
     context.stroke();
   }
+}
+
+/**
+ * Priority antenna marker (turn order + laser line-of-sight block when cell is empty).
+ * Same diamond + “A” as `public/antenna-laser-demo.html`. Draw before {@link drawLaserBeams} so beams paint on top.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ col: number, row: number } | null | undefined} antenna
+ * @param {number} cellSize
+ */
+export function drawPriorityAntenna(context, antenna, cellSize) {
+  if (!antenna) return;
+  const { col, row } = antenna;
+  const half = cellSize / 2;
+  const x = col * cellSize + half;
+  const y = row * cellSize + half;
+  const s = cellSize * 0.22;
+
+  context.save();
+  context.strokeStyle = "#0f172a";
+  context.fillStyle = "rgba(251, 191, 36, 0.35)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(x - s, y);
+  context.lineTo(x, y - s * 1.2);
+  context.lineTo(x + s, y);
+  context.lineTo(x, y + s * 1.2);
+  context.closePath();
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = "#0f172a";
+  context.font = `bold ${Math.round(cellSize * 0.38)}px system-ui, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "bottom";
+  context.fillText("A", x, y + cellSize * 0.42);
+  context.restore();
 }
 
 /**
