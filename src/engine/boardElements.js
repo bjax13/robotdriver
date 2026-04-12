@@ -1,6 +1,10 @@
 /**
  * Board elements: conveyors, gears, push panels, pits.
  * Resolve after each register during activation.
+ *
+ * Conveyors and push panels use hasWall from board geometry only — not
+ * movementPassability.js. Robot traits such as wallPhasing apply to programmed
+ * movement (applyMove), not belt/panel pushes.
  */
 
 import { inBounds, hasWall } from './board.js';

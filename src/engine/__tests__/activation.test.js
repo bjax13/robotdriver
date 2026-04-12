@@ -4,7 +4,6 @@ import {
   dealHands,
   setProgram,
   activateRound,
-  activateRegister,
   activateRegisterWithEvents,
   getHandDrawCount,
 } from '../activation.js';
@@ -168,5 +167,40 @@ describe('activation', () => {
     state = activateRound(state);
     expect(state.robots[0].direction).toBe(270);
     expect(state.robots[0].col).toBe(2);
+  });
+
+  it('SPAM in register draws from deck and executes drawn card', () => {
+    const board = createBoard(6, 5);
+    let state = createInitialState({
+      board,
+      robots: [{ col: 2, row: 2, direction: 90 }],
+      antenna: { col: 0, row: 0 },
+    });
+    state = {
+      ...state,
+      robots: [
+        {
+          ...state.robots[0],
+          registers: [
+            CARD_TYPES.SPAM,
+            CARD_TYPES.MOVE1,
+            CARD_TYPES.MOVE1,
+            CARD_TYPES.MOVE1,
+            CARD_TYPES.MOVE1,
+          ],
+          deck: [CARD_TYPES.MOVE1],
+          discard: [],
+          hand: [],
+        },
+      ],
+    };
+
+    const { state: after, events } = activateRegisterWithEvents(state, 0);
+    expect(after.robots[0].col).toBe(3);
+    expect(after.robots[0].row).toBe(2);
+    const robotEvents = events.filter((e) => e.kind === 'robot_action');
+    expect(robotEvents).toHaveLength(1);
+    expect(robotEvents[0].card).toBe(CARD_TYPES.MOVE1);
+    expect(robotEvents[0].action).toBe('move1');
   });
 });
