@@ -8,7 +8,10 @@
  * @returns {{ step: number, register: number, type: string, payload: object }}
  */
 function normalizeOne(e, step) {
-  const register = e.registerIndex;
+  const register =
+    typeof e.registerIndex === 'number' && Number.isInteger(e.registerIndex)
+      ? Math.min(4, Math.max(0, e.registerIndex))
+      : 0;
   switch (e.kind) {
     case 'robot_action':
       return {
@@ -51,7 +54,17 @@ function normalizeOne(e, step) {
         },
       };
     default:
-      throw new Error(`goldenTraceV0: unknown event kind ${e.kind}`);
+      return {
+        step,
+        register,
+        type: 'unknown_event',
+        payload: {
+          kind:
+            e.kind != null && String(e.kind).trim() !== ''
+              ? String(e.kind)
+              : 'unspecified',
+        },
+      };
   }
 }
 

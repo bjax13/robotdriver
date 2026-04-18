@@ -25,7 +25,8 @@
           { "$ref": "#/definitions/robot_action" },
           { "$ref": "#/definitions/laser_hit" },
           { "$ref": "#/definitions/board_resolve" },
-          { "$ref": "#/definitions/power_down_heal" }
+          { "$ref": "#/definitions/power_down_heal" },
+          { "$ref": "#/definitions/unknown_event" }
         ]
       }
     }
@@ -103,6 +104,24 @@
           "additionalProperties": false,
           "properties": {
             "robotId": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "unknown_event": {
+      "type": "object",
+      "required": ["step", "register", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 0 },
+        "register": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "type": { "type": "string", "const": "unknown_event" },
+        "payload": {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "minLength": 1 }
           }
         }
       }

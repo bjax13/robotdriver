@@ -27,6 +27,7 @@ Machine-readable regression artifacts for activation ordering and laser resoluti
    - `laser_hit`
    - `board_resolve`
    - `power_down_heal`
+   - `unknown_event` — used when the engine emits a `kind` not yet mapped in [`goldenTraceV0.js`](../src/engine/goldenTraceV0.js) (`payload.kind` carries the raw kind string).
 
 5. **Payload whitelist** — Only fields listed in the schema for each `type` may appear. Omit optional fields when unused.
 

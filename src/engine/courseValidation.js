@@ -196,6 +196,9 @@ export function validateCourse(course) {
 
   const reboot = reqArray(c.reboot, 'reboot');
   if (reboot === null) return { ok: false, errors };
+  if (reboot.length > 1) {
+    errors.push('reboot: at most one entry is supported');
+  }
   reboot.forEach((item, i) => {
     const prefix = `reboot[${i}]`;
     if (typeof item !== 'object' || item === null || Array.isArray(item)) {
@@ -233,7 +236,11 @@ export function validateCourse(course) {
       errors.push('antenna: expected object');
     } else {
       const a = /** @type {Record<string, unknown>} */ (c.antenna);
-      if (!cellInBounds(dims, a.col, a.row)) {
+      const colOk = typeof a.col === 'number' && Number.isInteger(a.col);
+      const rowOk = typeof a.row === 'number' && Number.isInteger(a.row);
+      if (!colOk || !rowOk) {
+        errors.push('antenna: col and row must both be integers when antenna is set');
+      } else if (!cellInBounds(dims, a.col, a.row)) {
         errors.push(`antenna col/row: out of bounds for ${dims.width}x${dims.height}`);
       }
     }
@@ -255,6 +262,8 @@ export function validateCourse(course) {
   if (c.robots !== undefined && c.robots !== null) {
     if (!Array.isArray(c.robots)) {
       errors.push('robots: expected array');
+    } else if (c.robots.length > 3) {
+      errors.push('robots: at most 3 entries supported');
     } else {
       c.robots.forEach((item, i) => {
         const prefix = `robots[${i}]`;
@@ -273,6 +282,16 @@ export function validateCourse(course) {
         }
       });
     }
+  }
+
+  const usesDefaultStart =
+    c.robots === undefined ||
+    c.robots === null ||
+    (Array.isArray(c.robots) && c.robots.length === 0);
+  if (usesDefaultStart && isPositiveIntDim(c.width) && isPositiveIntDim(c.height) && dims.width < 5) {
+    errors.push(
+      'width: must be at least 5 for default three-robot start positions on the top row (or set course.robots)'
+    );
   }
 
   if (errors.length === 0) return { ok: true };

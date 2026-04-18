@@ -16,6 +16,11 @@ describe('loadCourse', () => {
     const board = loadCourse({
       width: 4,
       height: 4,
+      robots: [
+        { col: 0, row: 0, direction: 90 },
+        { col: 1, row: 0, direction: 90 },
+        { col: 2, row: 0, direction: 90 },
+      ],
       walls: [{ col: 0, row: 0, edge: 'S' }],
       conveyors: [{ col: 1, row: 1, direction: 0, express: true }],
       gears: [{ col: 2, row: 2, type: 'L' }],
@@ -117,5 +122,60 @@ describe('loadCourse validation', () => {
     ['string', 'x'],
   ])('throws when course is %s', (_label, bad) => {
     expect(() => loadCourse(bad)).toThrow(CourseValidationError);
+  });
+
+  it('throws when width < 5 without explicit robots (default three start slots)', () => {
+    expect(() =>
+      loadCourse({
+        width: 4,
+        height: 4,
+        walls: [],
+      })
+    ).toThrow(CourseValidationError);
+    expect(() =>
+      loadCourse({
+        width: 4,
+        height: 4,
+        walls: [],
+      })
+    ).toThrow(/width: must be at least 5/);
+  });
+
+  it('throws when robots has more than three entries', () => {
+    expect(() =>
+      loadCourse({
+        width: 10,
+        height: 10,
+        robots: [
+          { col: 0, row: 0 },
+          { col: 1, row: 0 },
+          { col: 2, row: 0 },
+          { col: 3, row: 0 },
+        ],
+      })
+    ).toThrow(/at most 3/);
+  });
+
+  it('throws when antenna has only one coordinate', () => {
+    expect(() =>
+      loadCourse({
+        width: 10,
+        height: 10,
+        antenna: { col: 5 },
+      })
+    ).toThrow(/antenna: col and row must both be integers/);
+  });
+
+  it('throws when reboot has more than one entry', () => {
+    expect(() =>
+      loadCourse({
+        width: 10,
+        height: 10,
+        reboot: [
+          { col: 0, row: 0 },
+          { col: 1, row: 1 },
+        ],
+      })
+    ).toThrow(/reboot: at most one/);
   });
 });

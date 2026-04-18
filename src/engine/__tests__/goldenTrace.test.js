@@ -30,6 +30,20 @@ describe('golden trace v0', () => {
     expect(ok).toBe(true);
   });
 
+  it('maps unknown activation kinds to unknown_event without throwing', () => {
+    const normalized = normalizeActivationEventsToGoldenV0([
+      { kind: 'future_kind', registerIndex: 2 },
+    ]);
+    expect(normalized).toEqual([
+      {
+        step: 0,
+        register: 2,
+        type: 'unknown_event',
+        payload: { kind: 'future_kind' },
+      },
+    ]);
+  });
+
   it('replay matches normalized fixture events (priority + robot laser)', () => {
     let state = createInitialState({
       board: createBoard(6, 3),
