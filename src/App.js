@@ -796,11 +796,14 @@ function App() {
       <header className="App-header">
         <div className="gameMain">
         <details
+          open
           style={{
             marginBottom: 12,
             textAlign: "left",
             maxWidth: 720,
             alignSelf: "stretch",
+            position: "relative",
+            zIndex: 2,
           }}
         >
           <summary>Load course (paste JSON)</summary>
