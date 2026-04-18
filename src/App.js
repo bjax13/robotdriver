@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { Link, Route, Routes } from "react-router-dom";
 import "./App.css";
+import TestingIndex from "./testing/TestingIndex.js";
+import TestScenarioPage from "./testing/TestScenarioPage.js";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -346,7 +349,7 @@ function applyAutoplayProgramsToState(state, seedStr, rngMix, opts = {}) {
   return next;
 }
 
-function App() {
+function GameView() {
   const canvasRef = useRef(null);
   const eventLogRef = useRef(null);
   const [gameState, dispatch] = useReducer(gameReducer, initialState);
@@ -1280,6 +1283,31 @@ function App() {
         </div>
       </header>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <nav
+        style={{
+          padding: "10px 20px",
+          borderBottom: "1px solid #e2e8f0",
+          display: "flex",
+          gap: 20,
+          alignItems: "center",
+          background: "#fff",
+        }}
+      >
+        <Link to="/">Game</Link>
+        <Link to="/testing">Testing</Link>
+      </nav>
+      <Routes>
+        <Route path="/" element={<GameView />} />
+        <Route path="/testing" element={<TestingIndex />} />
+        <Route path="/testing/:id" element={<TestScenarioPage />} />
+      </Routes>
+    </>
   );
 }
 

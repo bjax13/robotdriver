@@ -31,7 +31,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-BRD-001 | Walls block movement per edge model (N/E/S/W on cell) | draft | [`src/engine/__tests__/board.test.js`](../src/engine/__tests__/board.test.js) |
+| PC-BRD-001 | Walls block movement per edge model (N/E/S/W on cell) | draft | [`src/engine/__tests__/board.test.js`](../src/engine/__tests__/board.test.js) · visual: `http://localhost:3000/testing/movement-walls-block` |
 
 ---
 
@@ -39,7 +39,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) |
+| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/conveyor-express-two`, `http://localhost:3000/testing/conveyor-normal-one`, `http://localhost:3000/testing/gear-rotate-left`, `http://localhost:3000/testing/push-panel-register-gate` |
 
 ---
 
@@ -79,7 +79,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-GST-001 | `applyMove` updates occupancy and pushing consistently | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) |
+| PC-GST-001 | `applyMove` updates occupancy and pushing consistently | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) · visual: `http://localhost:3000/testing/push-chain` |
 
 ---
 
@@ -87,7 +87,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics | draft | [`src/engine/__tests__/lasers.test.js`](../src/engine/__tests__/lasers.test.js) |
+| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics | draft | [`src/engine/__tests__/lasers.test.js`](../src/engine/__tests__/lasers.test.js) · visual: `http://localhost:3000/testing/laser-wall-block` |
 
 ---
 
@@ -95,7 +95,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-MOV-001 | Step forward/back respects walls and bounds | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) |
+| PC-MOV-001 | Step forward/back respects walls and bounds | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) · visual: `http://localhost:3000/testing/movement-walls-block` |
 
 ---
 
@@ -103,7 +103,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-MPV-001 | Passability merges walls, pits, and robot occupancy as documented | draft | [`src/engine/__tests__/movementPassability.test.js`](../src/engine/__tests__/movementPassability.test.js) |
+| PC-MPV-001 | Passability merges walls, pits, and robot occupancy as documented | draft | [`src/engine/__tests__/movementPassability.test.js`](../src/engine/__tests__/movementPassability.test.js) · visual: `http://localhost:3000/testing/pit-fall-spawn` |
 
 ---
 
@@ -119,7 +119,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-PRIO-001 | Sort key uses Manhattan distance to antenna with stable tie-break | draft | [`src/engine/__tests__/priority.test.js`](../src/engine/__tests__/priority.test.js) |
+| PC-PRIO-001 | Sort key uses Manhattan distance to antenna with stable tie-break | draft | [`src/engine/__tests__/priority.test.js`](../src/engine/__tests__/priority.test.js) · visual: `http://localhost:3000/testing/priority-tie-break` |
 
 ---
 
@@ -127,7 +127,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`src/engine/__tests__/push.test.js`](../src/engine/__tests__/push.test.js) |
+| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`src/engine/__tests__/push.test.js`](../src/engine/__tests__/push.test.js) · visual: `http://localhost:3000/testing/push-chain` |
 
 ---
 
@@ -135,7 +135,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-SCN-001 | Random checkpoint placement respects exclusions | draft | [`src/engine/__tests__/scenario.test.js`](../src/engine/__tests__/scenario.test.js) |
+| PC-SCN-001 | Random checkpoint placement respects exclusions | draft | [`src/engine/__tests__/scenario.test.js`](../src/engine/__tests__/scenario.test.js) · visual (checkpoint order): `http://localhost:3000/testing/checkpoint-sequence` |
 
 ---
 
