@@ -1,0 +1,146 @@
+# Parity checklist (RobotDriver)
+
+Status legend: **draft** (not proven) | **partial** | **green** (tests/traces linked)
+
+Row template:
+
+| ID | Rule / behavior | Status | Evidence (test file or golden trace) |
+|----|-------------------|--------|--------------------------------------|
+
+Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single example in each section.
+
+---
+
+## activation
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-ACT-001 | Five registers execute in antenna priority order each register | draft | [`src/engine/__tests__/activation.test.js`](../src/engine/__tests__/activation.test.js) |
+
+---
+
+## autoplay
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-AUTO-001 | Autoplay picks programs within locked-register constraints | draft | [`src/engine/__tests__/autoplay.test.js`](../src/engine/__tests__/autoplay.test.js) |
+
+---
+
+## board
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-BRD-001 | Walls block movement per edge model (N/E/S/W on cell) | draft | [`src/engine/__tests__/board.test.js`](../src/engine/__tests__/board.test.js) |
+
+---
+
+## boardElements
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) |
+
+---
+
+## cards
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-CRD-001 | Card types map to engine actions consistently | draft | [`src/engine/__tests__/hands.test.js`](../src/engine/__tests__/hands.test.js) |
+
+---
+
+## courses
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-CRS-001 | Course JSON validates before `loadCourse` builds a board | draft | [`src/engine/__tests__/courses.test.js`](../src/engine/__tests__/courses.test.js) |
+
+---
+
+## damage
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-DMG-001 | Laser hits apply damage and SPAM draws per engine rules | draft | [`src/engine/__tests__/damage.test.js`](../src/engine/__tests__/damage.test.js) |
+
+---
+
+## deck
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-DCK-001 | Shuffle/draw/discard behave deterministically with seeded decks | draft | [`src/engine/__tests__/hands.test.js`](../src/engine/__tests__/hands.test.js) |
+
+---
+
+## gameState
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-GST-001 | `applyMove` updates occupancy and pushing consistently | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) |
+
+---
+
+## lasers
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics | draft | [`src/engine/__tests__/lasers.test.js`](../src/engine/__tests__/lasers.test.js) |
+
+---
+
+## movement
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-MOV-001 | Step forward/back respects walls and bounds | draft | [`src/engine/__tests__/movement.test.js`](../src/engine/__tests__/movement.test.js) |
+
+---
+
+## movementPassability
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-MPV-001 | Passability merges walls, pits, and robot occupancy as documented | draft | [`src/engine/__tests__/movementPassability.test.js`](../src/engine/__tests__/movementPassability.test.js) |
+
+---
+
+## postRegisterBoard
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-PRB-001 | Post-register pipeline runs lasers then board elements in engine order | draft | [`src/engine/__tests__/postRegisterBoard.test.js`](../src/engine/__tests__/postRegisterBoard.test.js) |
+
+---
+
+## priority
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-PRIO-001 | Sort key uses Manhattan distance to antenna with stable tie-break | draft | [`src/engine/__tests__/priority.test.js`](../src/engine/__tests__/priority.test.js) |
+
+---
+
+## push
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`src/engine/__tests__/push.test.js`](../src/engine/__tests__/push.test.js) |
+
+---
+
+## scenario
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-SCN-001 | Random checkpoint placement respects exclusions | draft | [`src/engine/__tests__/scenario.test.js`](../src/engine/__tests__/scenario.test.js) |
+
+---
+
+## spawn / startLine
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-SPN-001 | Start slots map to grid cells for a given board width | draft | [`src/engine/__tests__/startLine.test.js`](../src/engine/__tests__/startLine.test.js), [`src/engine/__tests__/spawn.test.js`](../src/engine/__tests__/spawn.test.js) |

@@ -51,6 +51,7 @@ export {
   MAX_DAMAGE,
 } from './damage.js';
 export { loadCourse, DIZZY_HIGHWAY } from './courses.js';
+export { validateCourse, CourseValidationError } from './courseValidation.js';
 export { mulberry32 } from './random.js';
 export { getTopStartSlots, slotToCell } from './startLine.js';
 export { placeRandomCheckpoints, chooseInitialFacing } from './scenario.js';

@@ -2,6 +2,10 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Rules parity (RobotDriver)
+
+Edition anchor and parity checklist live in [`docs/rulebook-edition.md`](docs/rulebook-edition.md) and [`docs/parity-checklist.md`](docs/parity-checklist.md). Run/test commands and doc index: [`AGENTS.md`](AGENTS.md).
+
 ## Available Scripts
 
 In the project directory, you can run:

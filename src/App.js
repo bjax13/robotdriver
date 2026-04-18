@@ -44,6 +44,9 @@ import {
   MAX_DAMAGE,
   declarePowerDown,
   powerDownChance,
+  loadCourse,
+  CourseValidationError,
+  DIZZY_HIGHWAY,
 } from "./engine";
 
 const GRID_COLS = CANVAS_WIDTH / CELL_SIZE;
@@ -67,6 +70,56 @@ const DEMO_WALLS = [
 /** Factory wall lasers (same geometry as robot beams). */
 const DEMO_BOARD_LASERS = [{ col: 9, row: 0, direction: 270 }];
 
+function buildRobotSpecsForBoard(board) {
+  const cp0 =
+    board.checkpoints?.[0] ??
+    ({ col: Math.floor(board.width / 2), row: Math.floor(board.height / 2) });
+  return [1, 2, 3].map((slotNum) => {
+    const cell = slotToCell(board, slotNum);
+    if (!cell) {
+      throw new Error(`Invalid start slot ${slotNum} for board width ${board.width}`);
+    }
+    return {
+      col: cell.col,
+      row: cell.row,
+      direction: chooseInitialFacing(board, cell.col, cell.row, cp0.col, cp0.row),
+    };
+  });
+}
+
+/**
+ * @param {*} board
+ * @param {Record<string, unknown>} course
+ */
+function buildRobotSpecsFromCourse(board, course) {
+  if (Array.isArray(course.robots) && course.robots.length > 0) {
+    return course.robots.map((r) => ({
+      col: r.col,
+      row: r.row,
+      direction: r.direction ?? 90,
+    }));
+  }
+  return buildRobotSpecsForBoard(board);
+}
+
+/**
+ * @param {*} board
+ * @param {Record<string, unknown>} course
+ */
+function antennaFromCourse(board, course) {
+  if (course.antenna && typeof course.antenna === "object" && !Array.isArray(course.antenna)) {
+    const col = course.antenna.col;
+    const row = course.antenna.row;
+    if (typeof col === "number" && typeof row === "number") {
+      return { col, row };
+    }
+  }
+  return {
+    col: Math.floor(board.width / 2),
+    row: Math.floor(board.height / 2),
+  };
+}
+
 function buildDemoBoardAndRobots() {
   const board = createBoard(GRID_COLS, GRID_ROWS, DEMO_WALLS, DEMO_BOARD_LASERS);
   const demoElementCells = ["6,8", "7,8", "8,8", "5,5", "6,5", "4,4"];
@@ -84,18 +137,7 @@ function buildDemoBoardAndRobots() {
   };
   board.pushPanels = { "4,4": { registers: [1], direction: 90 } };
 
-  const cp0 = board.checkpoints[0];
-  const robotSpecs = [1, 2, 3].map((slotNum) => {
-    const cell = slotToCell(board, slotNum);
-    if (!cell) {
-      throw new Error(`Invalid start slot ${slotNum} for board width ${board.width}`);
-    }
-    return {
-      col: cell.col,
-      row: cell.row,
-      direction: chooseInitialFacing(board, cell.col, cell.row, cp0.col, cp0.row),
-    };
-  });
+  const robotSpecs = buildRobotSpecsForBoard(board);
 
   return { board, robotSpecs };
 }
@@ -317,6 +359,10 @@ function App() {
   const [autoPowerDownBots, setAutoPowerDownBots] = useState(true);
   const [autoStepMs, setAutoStepMs] = useState(800);
   const [dismissedWinnerId, setDismissedWinnerId] = useState(null);
+  const [courseJsonText, setCourseJsonText] = useState(() =>
+    JSON.stringify(DIZZY_HIGHWAY, null, 2)
+  );
+  const [courseLoadBanner, setCourseLoadBanner] = useState(null);
   const [devBoardRegister, setDevBoardRegister] = useState(0);
   const wrapHandledSessionRef = useRef(null);
   const autoplayRngMixRef = useRef(1);
@@ -352,6 +398,52 @@ function App() {
     setActivationSession(null);
     if (!preserveAutoStep) setAutoStep(false);
   }, []);
+
+  const handleLoadCourse = useCallback(() => {
+    clearActivationSession();
+    setCourseLoadBanner(null);
+    try {
+      const course = JSON.parse(courseJsonText);
+      const board = loadCourse(course);
+      const robotSpecs = buildRobotSpecsFromCourse(board, course);
+      const antenna = antennaFromCourse(board, course);
+      const seedBase =
+        typeof course.robotDeckSeedBase === "number" &&
+        Number.isInteger(course.robotDeckSeedBase) &&
+        course.robotDeckSeedBase >= 0
+          ? course.robotDeckSeedBase >>> 0
+          : 0xc0ffee;
+      const next = createInitialState({
+        board,
+        robots: robotSpecs,
+        antenna,
+        antennaDirection: course.antennaDirection ?? 90,
+        robotDeckSeedBase: seedBase,
+      });
+      dispatch({ type: "MERGE_STATE", payload: next });
+      setProgramDrafts({});
+      setCourseLoadBanner({
+        type: "ok",
+        text: `Loaded ${board.width}x${board.height}`,
+      });
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        setCourseLoadBanner({
+          type: "err",
+          lines: [`Invalid JSON: ${e.message}`],
+        });
+        return;
+      }
+      if (e instanceof CourseValidationError) {
+        setCourseLoadBanner({ type: "err", lines: e.errors });
+        return;
+      }
+      setCourseLoadBanner({
+        type: "err",
+        lines: [e?.message ? String(e.message) : String(e)],
+      });
+    }
+  }, [courseJsonText, clearActivationSession, dispatch]);
 
   const applyDevBoardState = useCallback(
     (next) => {
@@ -703,6 +795,64 @@ function App() {
       )}
       <header className="App-header">
         <div className="gameMain">
+        <details
+          style={{
+            marginBottom: 12,
+            textAlign: "left",
+            maxWidth: 720,
+            alignSelf: "stretch",
+          }}
+        >
+          <summary>Load course (paste JSON)</summary>
+          <p style={{ fontSize: 13, color: "#64748b", marginTop: 8 }}>
+            Edition anchor: see <code>docs/rulebook-edition.md</code>. Paste a course object (default
+            below is DIZZY_HIGHWAY).
+          </p>
+          <textarea
+            value={courseJsonText}
+            onChange={(e) => setCourseJsonText(e.target.value)}
+            spellCheck={false}
+            rows={10}
+            style={{
+              fontFamily: "ui-monospace, monospace",
+              fontSize: 12,
+              width: "100%",
+              boxSizing: "border-box",
+              marginTop: 8,
+            }}
+            aria-label="Course JSON"
+          />
+          <div style={{ marginTop: 8 }}>
+            <button type="button" onClick={handleLoadCourse}>
+              Load course
+            </button>
+          </div>
+          {courseLoadBanner?.type === "ok" && (
+            <div style={{ color: "#15803d", marginTop: 10, fontWeight: 600 }}>{courseLoadBanner.text}</div>
+          )}
+          {courseLoadBanner?.type === "err" && (
+            <div
+              role="alert"
+              style={{
+                color: "#b91c1c",
+                marginTop: 10,
+                padding: "8px 10px",
+                background: "#fef2f2",
+                borderRadius: 6,
+                border: "1px solid #fecaca",
+              }}
+            >
+              <strong>Could not load course</strong>
+              <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+                {courseLoadBanner.lines.map((line, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </details>
         <div className="gameTopRow">
           <canvas ref={canvasRef} />
           <div ref={eventLogRef} className="eventLogPanel">

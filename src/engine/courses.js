@@ -3,6 +3,7 @@
  */
 
 import { createBoard } from './board.js';
+import { validateCourse, CourseValidationError } from './courseValidation.js';
 
 /**
  * Parse course JSON into a board config.
@@ -19,6 +20,11 @@ import { createBoard } from './board.js';
  * @returns {import('./types').Board}
  */
 export function loadCourse(course) {
+  const validation = validateCourse(course);
+  if (!validation.ok) {
+    throw new CourseValidationError(validation.errors);
+  }
+
   const board = createBoard(
     course.width,
     course.height,

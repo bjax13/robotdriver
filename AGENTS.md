@@ -4,10 +4,15 @@
 
 This is **RobotDriver**, a client-side Robo Rally board game built with Create React App (React 18, `react-scripts 5.0.1`). There is no backend, database, or Docker dependency — the entire game engine runs in the browser.
 
+### Rules references
+
+- [`docs/rulebook-edition.md`](docs/rulebook-edition.md) — pinned edition + citation policy
+- [`docs/parity-checklist.md`](docs/parity-checklist.md) — parity checklist (stub; grows with coverage)
+
 ### Running the app
 
 - `npm start` — dev server on port 3000 with hot reload
-- `npm test` — Jest tests (88 tests across 18 suites); use `CI=true npm test` for non-interactive mode
+- `npm test` — Jest tests (126 tests across 23 suites); use `CI=true npm test` for non-interactive mode
 - `npm run build` — production build
 - `npx eslint src/` — lint (0 errors, 7 pre-existing warnings)
 

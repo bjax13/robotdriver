@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/bjax13/robotdriver/docs/golden-trace-v0.schema.json",
+  "title": "RobotDriver golden trace v0",
+  "type": "object",
+  "required": ["version", "scenarioId", "seed", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "0"
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/robot_action" },
+          { "$ref": "#/definitions/laser_hit" },
+          { "$ref": "#/definitions/board_resolve" },
+          { "$ref": "#/definitions/power_down_heal" }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "robot_action": {
+      "type": "object",
+      "required": ["step", "register", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 0 },
+        "register": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "type": { "type": "string", "const": "robot_action" },
+        "payload": {
+          "type": "object",
+          "required": ["priorityInRegister", "robotId", "card", "action"],
+          "additionalProperties": false,
+          "properties": {
+            "priorityInRegister": { "type": "integer", "minimum": 1 },
+            "robotId": { "type": "string", "minLength": 1 },
+            "card": { "type": "string" },
+            "action": { "type": "string" }
+          }
+        }
+      }
+    },
+    "laser_hit": {
+      "type": "object",
+      "required": ["step", "register", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 0 },
+        "register": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "type": { "type": "string", "const": "laser_hit" },
+        "payload": {
+          "type": "object",
+          "required": ["shooterId", "targetId"],
+          "additionalProperties": false,
+          "properties": {
+            "shooterId": { "type": "string", "minLength": 1 },
+            "targetId": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "board_resolve": {
+      "type": "object",
+      "required": ["step", "register", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 0 },
+        "register": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "type": { "type": "string", "const": "board_resolve" },
+        "payload": {
+          "type": "object",
+          "required": ["details"],
+          "additionalProperties": false,
+          "properties": {
+            "details": { "type": "string" }
+          }
+        }
+      }
+    },
+    "power_down_heal": {
+      "type": "object",
+      "required": ["step", "register", "type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "step": { "type": "integer", "minimum": 0 },
+        "register": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "type": { "type": "string", "const": "power_down_heal" },
+        "payload": {
+          "type": "object",
+          "required": ["robotId"],
+          "additionalProperties": false,
+          "properties": {
+            "robotId": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}
