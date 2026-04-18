@@ -1,0 +1,24 @@
+{
+  "date": "2026-04-18",
+  "url": "http://localhost:3000/",
+  "healthScore": 94,
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "title": "Load course button hit target broken when course panel collapsed",
+      "severity": "medium",
+      "category": "functional",
+      "fixCommit": "cb55948"
+    }
+  ],
+  "categoryScores": {
+    "console": 100,
+    "links": 100,
+    "visual": 92,
+    "functional": 92,
+    "ux": 90,
+    "performance": 95,
+    "content": 95,
+    "accessibility": 88
+  }
+}
