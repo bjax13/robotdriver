@@ -12,7 +12,7 @@ This is **RobotDriver**, a client-side Robo Rally board game built with Create R
 ### Running the app
 
 - `npm start` — dev server on port 3000 with hot reload
-- Testing gallery — `http://localhost:3000/testing` (visual engine rule scenarios; `/testing/:id` per scenario); how to add scenarios: [`src/testing/README.md`](src/testing/README.md)
+- Testing gallery — `http://localhost:3000/testing` (visual engine rule scenarios; `/testing/:id` per scenario); how to add scenarios and **reference examples** (lasers ordering/stacking, push+pits, conveyor merge contention, activation invariants, golden traces, autoplay vs damage): [`src/testing/README.md`](src/testing/README.md)
 - Golden traces (activation ordering, laser/board audit stream) — [`docs/golden-trace-v0.md`](docs/golden-trace-v0.md); fixtures in [`src/engine/__fixtures__/golden/`](src/engine/__fixtures__/golden/); see **Reference example (golden trace v0)** in [`src/testing/README.md`](src/testing/README.md)
 - `npm test` — Jest tests; use `CI=true npm test` for non-interactive mode
 - `npm run build` — production build

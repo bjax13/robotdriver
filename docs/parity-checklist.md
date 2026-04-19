@@ -88,7 +88,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics; `listAllLaserHits` order matches laser audit + stacked damage | draft | [`lasers.test.js`](../src/engine/__tests__/lasers.test.js) (`listAllLaserHits` ordering / first hit / stacking) · [`README` — lasers example](../src/testing/README.md#reference-example-lasers--ordering-first-hit-stacked-damage) · visual: `http://localhost:3000/testing/laser-wall-block` |
+| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics; `listAllLaserHits` order matches laser audit + stacked damage | draft | [`lasers.test.js`](../src/engine/__tests__/lasers.test.js) (`listAllLaserHits` ordering / first hit / stacking) · scenario doc: [`src/testing/README.md`](../src/testing/README.md) (section **Reference example (lasers — ordering, first hit, stacked damage)**) · visual: `http://localhost:3000/testing/laser-wall-block` |
 
 ---
 
@@ -129,7 +129,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`push.test.js`](../src/engine/__tests__/push.test.js) (chains; pit reboot + reboot square integration) · [`README` — push example](../src/testing/README.md#reference-example-push--pit-reboot-reboot-square-conveyor-vs-push-panel) · visual: `http://localhost:3000/testing/push-chain` |
+| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`push.test.js`](../src/engine/__tests__/push.test.js) (chains; pit reboot + reboot square integration) · scenario doc: [`src/testing/README.md`](../src/testing/README.md) (section **Reference example (push — pit reboot, reboot square, conveyor vs push panel)**) · visual: `http://localhost:3000/testing/push-chain` |
 
 ---
 
