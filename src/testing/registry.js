@@ -1,5 +1,6 @@
 import { movementWallsBlock } from "./scenarios/movementWallsBlock.js";
 import { pushChain } from "./scenarios/pushChain.js";
+import { pushChainWallBlock } from "./scenarios/pushChainWallBlock.js";
 import { priorityTieBreak } from "./scenarios/priorityTieBreak.js";
 import { conveyorExpressOneTile } from "./scenarios/conveyorExpressOneTile.js";
 import { conveyorExpressTwoTiles } from "./scenarios/conveyorExpressTwoTiles.js";
@@ -14,6 +15,7 @@ import { checkpointSequence } from "./scenarios/checkpointSequence.js";
 export const testScenarios = [
   movementWallsBlock,
   pushChain,
+  pushChainWallBlock,
   priorityTieBreak,
   conveyorExpressOneTile,
   conveyorExpressTwoTiles,

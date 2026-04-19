@@ -15,6 +15,7 @@ import {
   drawRobot,
   drawLaserBeams,
   drawBoardLaserEmitters,
+  drawPits,
   drawPushPanels,
   drawPriorityAntenna,
   drawSpawnMarkers,
@@ -68,6 +69,8 @@ const DEMO_WALLS = [
   { col: 2, row: 2, edge: "N" },
   { col: 3, row: 2, edge: "N" },
   { col: 4, row: 2, edge: "N" },
+  // Wall push panel at (4,4) pushes east; mount segment on west edge of that cell.
+  { col: 4, row: 4, edge: "W" },
 ];
 
 /** Factory wall lasers (same geometry as robot beams). */
@@ -586,6 +589,7 @@ function GameView() {
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
+    drawPits(context, displayState.board, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
     drawConveyors(context, displayState.board, CELL_SIZE, beltPhaseRef.current);

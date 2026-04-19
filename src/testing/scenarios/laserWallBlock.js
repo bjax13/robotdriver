@@ -7,11 +7,12 @@ export const laserWallBlock = {
   id: "laser-wall-block",
   title: "Board laser blocked by wall",
   module: "lasers",
-  description: "A factory laser beam stops at a wall segment; the robot beyond takes no damage.",
+  description:
+    "A factory laser fires east across two open cells before a wall stops the beam; the robot farther east takes no damage.",
   parityIds: ["PC-LSR-001"],
   testEvidence: "src/engine/__tests__/lasers.test.js",
   buildState: () => {
-    const walls = [{ col: 0, row: 2, edge: "E" }];
+    const walls = [{ col: 2, row: 2, edge: "E" }];
     const boardLasers = [{ col: 0, row: 2, direction: 90 }];
     const board = createBoard(8, 6, walls, boardLasers);
     return createInitialState({

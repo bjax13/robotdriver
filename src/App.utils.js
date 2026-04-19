@@ -126,6 +126,59 @@ function boardDirectionUnit(directionDeg) {
 }
 
 /**
+ * Pixel center of the wall edge the push panel mounts on (opposite the push direction).
+ * @param {number} col
+ * @param {number} row
+ * @param {number} directionDeg - push direction (0=N, 90=E, …)
+ * @param {number} cellSize
+ * @returns {{ x: number, y: number }}
+ */
+function pushPanelMountPoint(col, row, directionDeg, cellSize) {
+  const left = col * cellSize;
+  const top = row * cellSize;
+  const half = cellSize / 2;
+  const d = ((directionDeg % 360) + 360) % 360;
+  if (d === 0) return { x: left + half, y: top + cellSize }; // south edge → push north
+  if (d === 90) return { x: left, y: top + half }; // west → push east
+  if (d === 180) return { x: left + half, y: top }; // north → push south
+  if (d === 270) return { x: left + cellSize, y: top + half }; // east → push west
+  const back = boardDirectionUnit((directionDeg + 180) % 360);
+  return { x: left + half + back.ux * half, y: top + half + back.uy * half };
+}
+
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w
+ * @param {number} h
+ * @param {number} r
+ */
+function fillRoundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(Math.max(0, r), w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function strokeRoundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(Math.max(0, r), w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+/**
  * @param {CanvasRenderingContext2D} context
  * @param {number} cx
  * @param {number} cy
@@ -281,7 +334,7 @@ export function drawConveyors(context, board, cellSize, beltPhase) {
 }
 
 /**
- * Wall push panels: arrow in push direction; tiny register list.
+ * Wall push panels: bracket on the mounting edge, arrow points into the cell (push direction).
  * @param {CanvasRenderingContext2D} context
  * @param {{ width: number, height: number, pushPanels?: Record<string, number[] | { registers: number[], direction?: number }> }} board
  * @param {number} cellSize
@@ -291,53 +344,77 @@ export function drawPushPanels(context, board, cellSize) {
   if (!pushPanels) return;
 
   const half = cellSize / 2;
-  const scale = Math.max(7, cellSize * 0.18);
+  const plateDepth = Math.max(9, cellSize * 0.19);
+  const plateSpan = cellSize * 0.76;
+  const plateR = Math.min(5, cellSize * 0.07);
+  const accentR = plateR * 0.65;
+  const arrowLen = Math.max(7, cellSize * 0.13);
+  const arrowHalfW = arrowLen * 0.42;
 
   for (const [key, config] of Object.entries(pushPanels)) {
     const cfg = Array.isArray(config) ? { registers: config, direction: 180 } : config;
     const [col, row] = key.split(",").map(Number);
     if (col < 0 || row < 0 || col >= board.width || row >= board.height) continue;
 
-    const cx = col * cellSize + half;
-    const cy = row * cellSize + half;
     const dir = cfg.direction ?? 180;
     const forward = boardDirectionUnit(dir);
     const perp = { ux: -forward.uy, uy: forward.ux };
+    const mount = pushPanelMountPoint(col, row, dir, cellSize);
 
     context.save();
-    context.strokeStyle = "#7c3aed";
-    context.fillStyle = "rgba(124, 58, 237, 0.2)";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.arc(cx, cy, scale * 1.1, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
+    context.translate(mount.x, mount.y);
+    context.rotate(Math.atan2(forward.uy, forward.ux));
 
-    const tipX = cx + forward.ux * scale * 1.2;
-    const tipY = cy + forward.uy * scale * 1.2;
+    // Metal plate hugging the wall (local +x = into the cell, away from mount)
+    context.fillStyle = "rgba(148, 163, 184, 0.7)";
+    context.strokeStyle = "#64748b";
+    context.lineWidth = 1.5;
+    fillRoundRect(context, 0, -plateSpan / 2, plateDepth, plateSpan, plateR);
+    strokeRoundRect(context, 0, -plateSpan / 2, plateDepth, plateSpan, plateR);
+
+    // Violet actuator pad
+    context.fillStyle = "rgba(124, 58, 237, 0.42)";
+    fillRoundRect(
+      context,
+      plateDepth * 0.12,
+      (-plateSpan * 0.78) / 2,
+      plateDepth * 0.76,
+      plateSpan * 0.78,
+      accentR
+    );
+
+    // Rivet dots (optional depth cue)
+    context.fillStyle = "rgba(71, 85, 105, 0.85)";
+    const rivetInset = plateSpan * 0.38;
+    const rivetX = plateDepth * 0.48;
     context.beginPath();
-    context.moveTo(tipX, tipY);
-    context.lineTo(
-      cx + forward.ux * scale * 0.2 + perp.ux * scale * 0.65,
-      cy + forward.uy * scale * 0.2 + perp.uy * scale * 0.65
-    );
-    context.lineTo(
-      cx + forward.ux * scale * 0.2 - perp.ux * scale * 0.65,
-      cy + forward.uy * scale * 0.2 - perp.uy * scale * 0.65
-    );
-    context.closePath();
-    context.fillStyle = "#6d28d9";
+    context.arc(rivetX, -rivetInset, Math.max(1.5, cellSize * 0.035), 0, Math.PI * 2);
+    context.arc(rivetX, rivetInset, Math.max(1.5, cellSize * 0.035), 0, Math.PI * 2);
     context.fill();
+
+    // Push arrow — tip reaches further into free space
+    const tipX = plateDepth + arrowLen * 1.05;
+    const baseX = plateDepth + arrowLen * 0.22;
+    context.beginPath();
+    context.moveTo(tipX, 0);
+    context.lineTo(baseX, arrowHalfW);
+    context.lineTo(baseX, -arrowHalfW);
+    context.closePath();
+    context.fillStyle = "#5b21b6";
+    context.fill();
+
+    context.restore();
 
     const regLabel = (cfg.registers ?? []).join(",");
     if (regLabel) {
+      const cx = col * cellSize + half + forward.ux * (cellSize * 0.28) + perp.ux * (cellSize * 0.08);
+      const cy = row * cellSize + half + forward.uy * (cellSize * 0.28) + perp.uy * (cellSize * 0.08);
       context.fillStyle = "#4c1d95";
-      context.font = `${Math.round(cellSize * 0.2)}px monospace`;
+      context.font = `${Math.round(cellSize * 0.18)}px monospace`;
       context.textAlign = "center";
-      context.textBaseline = "top";
-      context.fillText(`R${regLabel}`, cx, row * cellSize + 2);
+      context.textBaseline = "middle";
+      context.fillText(`R${regLabel}`, cx, cy);
     }
-    context.restore();
   }
 }
 
@@ -435,6 +512,50 @@ export function drawCheckpoints(context, board, cellSize) {
     context.textBaseline = "middle";
     context.fillText(String(i + 1), x, y);
   });
+}
+
+/**
+ * Pit cells — drawn after the grid so wall strokes on edges stay visible above the void fill.
+ * Matches engine storage: plain object `"col,row"` → truthy, or Set of keys.
+ * @param {CanvasRenderingContext2D} context
+ * @param {{ width: number, height: number, pits?: Record<string, unknown>|Set<string> }} board
+ * @param {number} cellSize
+ */
+export function drawPits(context, board, cellSize) {
+  const pits = board.pits;
+  if (!pits) return;
+
+  const keys =
+    pits instanceof Set ? [...pits] : Object.keys(pits).filter((k) => pits[k]);
+
+  const inset = Math.max(2, cellSize * 0.08);
+  const rr = Math.max(2, cellSize * 0.12);
+
+  for (const key of keys) {
+    const [col, row] = key.split(",").map(Number);
+    if (!Number.isFinite(col) || !Number.isFinite(row)) continue;
+    if (col < 0 || row < 0 || col >= board.width || row >= board.height) continue;
+
+    const left = col * cellSize + inset;
+    const top = row * cellSize + inset;
+    const w = cellSize - 2 * inset;
+    const h = cellSize - 2 * inset;
+    if (w <= 0 || h <= 0) continue;
+
+    context.fillStyle = "rgba(15, 23, 42, 0.92)";
+    fillRoundRect(context, left, top, w, h, rr);
+
+    const cx = col * cellSize + cellSize / 2;
+    const cy = row * cellSize + cellSize / 2;
+    context.fillStyle = "rgba(2, 6, 23, 0.95)";
+    context.beginPath();
+    context.ellipse(cx, cy, w * 0.36, h * 0.36, 0, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = "#64748b";
+    context.lineWidth = 1;
+    strokeRoundRect(context, left, top, w, h, rr);
+  }
 }
 
 /**

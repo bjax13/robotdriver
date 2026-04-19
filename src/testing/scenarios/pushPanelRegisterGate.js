@@ -12,7 +12,9 @@ export const pushPanelRegisterGate = {
   parityIds: ["PC-BEL-001"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
   buildState: () => {
-    const board = createBoard(7, 7);
+    // East-facing wall push panel is mounted on this cell's west edge.
+    const walls = [{ col: 2, row: 2, edge: "W" }];
+    const board = createBoard(7, 7, walls);
     board.pushPanels = {
       "2,2": { registers: [1], direction: 90 },
     };
