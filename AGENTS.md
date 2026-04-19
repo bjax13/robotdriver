@@ -12,10 +12,17 @@ This is **RobotDriver**, a client-side Robo Rally board game built with Create R
 ### Running the app
 
 - `npm start` — dev server on port 3000 with hot reload
-- Testing gallery — `http://localhost:3000/testing` (visual engine rule scenarios; `/testing/:id` per scenario)
-- `npm test` — Jest tests (126 tests across 23 suites); use `CI=true npm test` for non-interactive mode
+- Testing gallery — `http://localhost:3000/testing` (visual engine rule scenarios; `/testing/:id` per scenario); how to add scenarios: [`src/testing/README.md`](src/testing/README.md)
+- Golden traces (activation ordering, laser/board audit stream) — [`docs/golden-trace-v0.md`](docs/golden-trace-v0.md); fixtures in [`src/engine/__fixtures__/golden/`](src/engine/__fixtures__/golden/); see **Reference example (golden trace v0)** in [`src/testing/README.md`](src/testing/README.md)
+- `npm test` — Jest tests; use `CI=true npm test` for non-interactive mode
 - `npm run build` — production build
 - `npx eslint src/` — lint (0 errors, 7 pre-existing warnings)
+
+### Engine rule tests ↔ parity checklist
+
+Rule behavior and regression coverage are tracked in [`docs/parity-checklist.md`](docs/parity-checklist.md) (PC-* rows). When you add or extend a rule, link the test file (and optional visual `/testing/:id` URL) in that row.
+
+**Example (autoplay vs damage):** [`PC-AUTO-001`](docs/parity-checklist.md) — [`src/engine/__tests__/autoplay.test.js`](src/engine/__tests__/autoplay.test.js) asserts `pickProgram` returns at most `getUnlockedRegisterCount` cards, returns `[]` if `hand.length` is below that (so draw limits cannot be bypassed), and that after `dealHands` the dealt hand size matches `getHandDrawCount` while pick count matches unlocked slots for typical damage values. Locked registers apply only when the robot already has **five** register slots (`getLockedRegisterCount`); build that state before asserting damage-related unlock counts.
 
 ### Notes
 

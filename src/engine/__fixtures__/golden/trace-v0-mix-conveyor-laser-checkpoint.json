@@ -1,0 +1,55 @@
+{
+  "version": "0",
+  "scenarioId": "mix-conveyor-robot-laser-wall-laser-checkpoint-register0",
+  "seed": 0,
+  "events": [
+    {
+      "step": 0,
+      "register": 0,
+      "type": "robot_action",
+      "payload": {
+        "priorityInRegister": 1,
+        "robotId": "r1",
+        "card": "powerUp",
+        "action": "powerUp"
+      }
+    },
+    {
+      "step": 1,
+      "register": 0,
+      "type": "robot_action",
+      "payload": {
+        "priorityInRegister": 2,
+        "robotId": "r2",
+        "card": "powerUp",
+        "action": "powerUp"
+      }
+    },
+    {
+      "step": 2,
+      "register": 0,
+      "type": "laser_hit",
+      "payload": {
+        "shooterId": "r1",
+        "targetId": "r2"
+      }
+    },
+    {
+      "step": 3,
+      "register": 0,
+      "type": "laser_hit",
+      "payload": {
+        "shooterId": "wall:7,2:270",
+        "targetId": "r2"
+      }
+    },
+    {
+      "step": 4,
+      "register": 0,
+      "type": "board_resolve",
+      "payload": {
+        "details": "conveyors, gears, push panels, pits, checkpoints"
+      }
+    }
+  ]
+}

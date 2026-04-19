@@ -12,6 +12,12 @@
  * 3. **Activation** — `activation.js` `activateRegisterWithEvents`: priority order,
  *    `robot_action` events, then `board_resolve`. Use for register-level and phase flow.
  *
+ * 4. **Cross-cutting invariants** — `__tests__/invariants.test.js`: after `applyMove` and
+ *    after each `activateRegisterWithEvents` / full `activateRound`, assert no two active
+ *    robots share a cell, every emitted `robot_action` names a robot still in state, and
+ *    when `winner` is set the winner’s `nextCheckpoint` has cleared every flag. Use this to
+ *    catch subtle corruption when wiring new board or activation behavior.
+ *
  * When a rule branches on “other robots present” or per-robot traits, add **parity** tests
  * (solo vs multi-robot) like `__tests__/wallPath.test.js`.
  */

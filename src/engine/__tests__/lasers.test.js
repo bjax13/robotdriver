@@ -7,6 +7,9 @@ import {
   listAllLaserHits,
   boardLaserShooterId,
 } from '../lasers.js';
+import { runPostRegisterBoardElements } from '../postRegisterBoard.js';
+import { createInitialState } from '../gameState.js';
+import { CARD_TYPES } from '../cards.js';
 
 describe('raycast antenna', () => {
   it('does not hit robot behind priority antenna (empty antenna cell blocks)', () => {
@@ -171,6 +174,55 @@ describe('listAllLaserHits', () => {
       { shooterId: 'r1', targetId: 'r2' },
       { shooterId: boardLaserShooterId(7, 1, 270), targetId: 'r3' },
     ]);
+  });
+
+  /**
+   * Ordering contract (see lasers.js): listLaserHits (robots in state order, each raycast)
+   * then listBoardLaserHits (emitters in board.boardLasers array order).
+   */
+  it('lists one raycast hit per shooter; only the first robot in a line is struck', () => {
+    const board = createBoard(10, 3);
+    const robots = [
+      { id: 'shooter', col: 1, row: 1, direction: 90 },
+      { id: 'first', col: 3, row: 1, direction: 0 },
+      { id: 'behind', col: 5, row: 1, direction: 0 },
+    ];
+    expect(listLaserHits(board, robots)).toEqual([
+      { shooterId: 'shooter', targetId: 'first' },
+    ]);
+    expect(raycast(board, robots, 1, 1, 90, 'shooter')?.id).toBe('first');
+  });
+
+  it('lists separate entries when multiple beams strike the same target (ordering preserved)', () => {
+    const board = createBoard(8, 3, [], [{ col: 5, row: 1, direction: 270 }]);
+    const robots = [
+      { id: 'a', col: 2, row: 1, direction: 90 },
+      { id: 'b', col: 6, row: 1, direction: 270 },
+      { id: 'victim', col: 4, row: 1, direction: 0 },
+    ];
+    const hits = listAllLaserHits(board, robots);
+    expect(hits.filter((h) => h.targetId === 'victim')).toEqual([
+      { shooterId: 'a', targetId: 'victim' },
+      { shooterId: 'b', targetId: 'victim' },
+      { shooterId: boardLaserShooterId(5, 1, 270), targetId: 'victim' },
+    ]);
+  });
+
+  it('stacks damage and SPAM in one register from listAllLaserHits order (via post-register lasers)', () => {
+    const board = createBoard(8, 3, [], [{ col: 5, row: 1, direction: 270 }]);
+    let state = createInitialState({
+      board,
+      robots: [
+        { col: 1, row: 1, direction: 90 },
+        { col: 7, row: 1, direction: 270 },
+        { col: 3, row: 1, direction: 0 },
+      ],
+      antenna: { col: 0, row: 0 },
+    });
+    const { state: after } = runPostRegisterBoardElements(state, 0);
+    const v = after.robots.find((r) => r.id === 'r3');
+    expect(v?.damage).toBe(3);
+    expect(v?.discard?.filter((c) => c === CARD_TYPES.SPAM).length ?? 0).toBe(3);
   });
 
   it('omits hits blocked by antenna between shooter and target', () => {

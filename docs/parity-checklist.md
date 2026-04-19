@@ -23,7 +23,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-AUTO-001 | Autoplay picks programs within locked-register constraints | draft | [`src/engine/__tests__/autoplay.test.js`](../src/engine/__tests__/autoplay.test.js) |
+| PC-AUTO-001 | Autoplay (`pickProgram`) uses only unlocked registers; hand must cover unlocked slots (damage caps draw via `dealHands` / `getHandDrawCount`) | draft | [`autoplay.test.js`](../src/engine/__tests__/autoplay.test.js) — e.g. `pickProgram` vs `pickProgram vs damage draw limits and locked registers` (insufficient hand → `[]`, pick length ≤ `getUnlockedRegisterCount`, `dealHands` ↔ unlocked count for damage 0–4) |
 
 ---
 
@@ -39,7 +39,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/conveyor-express-one-tile`, `http://localhost:3000/testing/conveyor-express-two-tiles`, `http://localhost:3000/testing/conveyor-normal-one`, `http://localhost:3000/testing/gear-rotate-left`, `http://localhost:3000/testing/push-panel-register-gate` |
+| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/conveyor-express-one-tile`, `http://localhost:3000/testing/conveyor-express-two-tiles`, `http://localhost:3000/testing/conveyor-normal-one`, `http://localhost:3000/testing/conveyor-then-push-panel`, `http://localhost:3000/testing/gear-rotate-left`, `http://localhost:3000/testing/push-panel-register-gate` |
 
 ---
 
@@ -64,6 +64,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
 | PC-DMG-001 | Laser hits apply damage and SPAM draws per engine rules | draft | [`src/engine/__tests__/damage.test.js`](../src/engine/__tests__/damage.test.js) |
+| PC-DMG-002 | `addDamage`, `drawForSpam`, `rebootRobot` semantics (discard, reshuffle, reboot square) | draft | [`src/engine/__tests__/damage.test.js`](../src/engine/__tests__/damage.test.js) · visual: `http://localhost:3000/testing/damage-spam-reboot-draw` |
 
 ---
 
@@ -87,7 +88,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics | draft | [`src/engine/__tests__/lasers.test.js`](../src/engine/__tests__/lasers.test.js) · visual: `http://localhost:3000/testing/laser-wall-block` |
+| PC-LSR-001 | Robot beams and board lasers use same raycast / blocking semantics; `listAllLaserHits` order matches laser audit + stacked damage | draft | [`lasers.test.js`](../src/engine/__tests__/lasers.test.js) (`listAllLaserHits` ordering / first hit / stacking) · [`README` — lasers example](../src/testing/README.md#reference-example-lasers--ordering-first-hit-stacked-damage) · visual: `http://localhost:3000/testing/laser-wall-block` |
 
 ---
 
@@ -112,6 +113,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
 | PC-PRB-001 | Post-register pipeline runs lasers then board elements in engine order | draft | [`src/engine/__tests__/postRegisterBoard.test.js`](../src/engine/__tests__/postRegisterBoard.test.js) |
+| PC-PRB-002 | Checkpoints advance only when on `checkpoints[nextCheckpoint]` (later flags ignored until due; 2016 next-flag) | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/checkpoint-later-flag-ignored` |
 
 ---
 
@@ -127,7 +129,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`src/engine/__tests__/push.test.js`](../src/engine/__tests__/push.test.js) · visual: `http://localhost:3000/testing/push-chain` |
+| PC-PSH-001 | Push chains resolve without overlapping robots | draft | [`push.test.js`](../src/engine/__tests__/push.test.js) (chains; pit reboot + reboot square integration) · [`README` — push example](../src/testing/README.md#reference-example-push--pit-reboot-reboot-square-conveyor-vs-push-panel) · visual: `http://localhost:3000/testing/push-chain` |
 
 ---
 
