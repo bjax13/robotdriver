@@ -2,7 +2,7 @@ import { createBoard } from '../board.js';
 import { createInitialState } from '../gameState.js';
 import { dealHands, setProgram, activateRound, activateRegister } from '../activation.js';
 import { CARD_TYPES } from '../cards.js';
-import { resolvePushPanels, resolveConveyors } from '../boardElements.js';
+import { resolvePushPanels, resolveConveyors, resolveGears } from '../boardElements.js';
 
 describe('board elements', () => {
   it('robot on right gear rotates clockwise each register', () => {
@@ -25,6 +25,18 @@ describe('board elements', () => {
     expect(state.robots[0].col).toBe(2);
     expect(state.robots[0].row).toBe(2);
     expect(state.robots[0].direction).toBe(180);
+  });
+
+  it('resolveGears applies +90° for R (clockwise) gear', () => {
+    const board = createBoard(5, 5);
+    board.gears = { '3,3': 'R' };
+    const state = createInitialState({
+      board,
+      robots: [{ col: 3, row: 3, direction: 180 }],
+      antenna: { col: 0, row: 0 },
+    });
+    const updates = resolveGears(state);
+    expect(updates.get('r1')).toEqual({ direction: 270 });
   });
 
   it('robot on left gear rotates counterclockwise each register', () => {

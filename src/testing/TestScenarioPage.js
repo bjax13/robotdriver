@@ -9,6 +9,7 @@ import {
   drawGears,
   drawGrid,
   drawLaserBeams,
+  drawPits,
   drawPriorityAntenna,
   drawPushPanels,
   drawRobot,
@@ -80,6 +81,7 @@ export default function TestScenarioPage() {
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
+    drawPits(context, state.board, CELL_SIZE);
     const walls = boardToWallSegments(state.board, CELL_SIZE);
     drawWalls(context, walls);
     drawConveyors(context, state.board, CELL_SIZE, beltPhaseRef.current);

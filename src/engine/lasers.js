@@ -103,8 +103,13 @@ export function listAllLaserHits(board, robots, antenna) {
 /**
  * Cell centers along the beam from (col,row) through the first hit or edge, for rendering.
  * Path excludes the shooter cell; includes the struck cell when a robot is hit.
+ *
+ * `stopReason`: `'wall'` / `'edge'` — beam stops in an empty cell before a wall or board edge (UI draws to the
+ * far side of that cell). `'robot'` / `'antenna'` — stop at cell center. `'none'` — no beam cells (e.g. wall
+ * flush with emitter).
+ *
  * @param {{ col: number, row: number } | null | undefined} [antenna]
- * @returns {{ path: { col: number, row: number }[], hitRobotId: string | null }}
+ * @returns {{ path: { col: number, row: number }[], hitRobotId: string | null, stopReason: 'robot'|'antenna'|'wall'|'edge'|'none' }}
  */
 export function traceLaserPath(board, robots, col, row, direction, excludeId, antenna) {
   const { dCol, dRow } = directionDelta(direction);
@@ -120,13 +125,21 @@ export function traceLaserPath(board, robots, col, row, direction, excludeId, an
   let c = col + dCol;
   let r = row + dRow;
   while (c >= 0 && c < board.width && r >= 0 && r < board.height) {
-    if (hasWall(board, c - dCol, r - dRow, direction)) break;
+    if (hasWall(board, c - dCol, r - dRow, direction)) {
+      return { path, hitRobotId: null, stopReason: 'wall' };
+    }
     path.push({ col: c, row: r });
     const hit = cellToRobot.get(`${c},${r}`);
-    if (hit) return { path, hitRobotId: hit.id };
-    if (antenna != null && antenna.col === c && antenna.row === r) return { path, hitRobotId: null };
+    if (hit) return { path, hitRobotId: hit.id, stopReason: 'robot' };
+    if (antenna != null && antenna.col === c && antenna.row === r) {
+      return { path, hitRobotId: null, stopReason: 'antenna' };
+    }
     c += dCol;
     r += dRow;
   }
-  return { path, hitRobotId: null };
+  return {
+    path,
+    hitRobotId: null,
+    stopReason: path.length === 0 ? 'none' : 'edge',
+  };
 }

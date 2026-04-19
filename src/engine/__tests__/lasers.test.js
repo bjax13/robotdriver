@@ -62,8 +62,9 @@ describe('traceLaserPath', () => {
       { id: 'r2', col: 4, row: 1, direction: 0 },
     ];
     const hit = raycast(board, robots, 1, 1, 90, 'r1');
-    const { path, hitRobotId } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
+    const { path, hitRobotId, stopReason } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
     expect(hit?.id).toBe(hitRobotId);
+    expect(stopReason).toBe('robot');
     expect(path[path.length - 1]).toEqual({ col: 4, row: 1 });
   });
 
@@ -74,8 +75,9 @@ describe('traceLaserPath', () => {
       { id: 'r2', col: 3, row: 1, direction: 0 },
     ];
     expect(raycast(board, robots, 1, 1, 90, 'r1')).toBeNull();
-    const { path, hitRobotId } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
+    const { path, hitRobotId, stopReason } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
     expect(hitRobotId).toBeNull();
+    expect(stopReason).toBe('wall');
     expect(path).toEqual([]);
   });
 
@@ -87,9 +89,32 @@ describe('traceLaserPath', () => {
       { id: 'r2', col: 5, row: 1, direction: 0 },
     ];
     expect(raycast(board, robots, 1, 1, 90, 'r1', antenna)).toBeNull();
-    const { path, hitRobotId } = traceLaserPath(board, robots, 1, 1, 90, 'r1', antenna);
+    const { path, hitRobotId, stopReason } = traceLaserPath(board, robots, 1, 1, 90, 'r1', antenna);
     expect(hitRobotId).toBeNull();
+    expect(stopReason).toBe('antenna');
     expect(path).toEqual([{ col: 2, row: 1 }, { col: 3, row: 1 }]);
+  });
+
+  it('reports wall stop after crossing empty cells (termination cell has no robot)', () => {
+    const board = createBoard(8, 3, [{ col: 4, row: 1, edge: 'E' }]);
+    const robots = [{ id: 'r1', col: 1, row: 1, direction: 90 }];
+    const { path, hitRobotId, stopReason } = traceLaserPath(board, robots, 1, 1, 90, 'r1');
+    expect(hitRobotId).toBeNull();
+    expect(stopReason).toBe('wall');
+    expect(path).toEqual([
+      { col: 2, row: 1 },
+      { col: 3, row: 1 },
+      { col: 4, row: 1 },
+    ]);
+  });
+
+  it('reports edge stop on last in-bounds cell before leaving board', () => {
+    const board = createBoard(6, 8);
+    const robots = [{ id: 'r1', col: 3, row: 6, direction: 0 }];
+    const { path, hitRobotId, stopReason } = traceLaserPath(board, robots, 3, 6, 0, 'r1');
+    expect(hitRobotId).toBeNull();
+    expect(stopReason).toBe('edge');
+    expect(path[path.length - 1]).toEqual({ col: 3, row: 0 });
   });
 });
 

@@ -1,4 +1,5 @@
 import { traceLaserPath } from "./engine/lasers.js";
+import { directionDelta } from "./engine/movement.js";
 import { toPixelCenter } from "./engine/canvasAdapter.js";
 
 export const CANVAS_WIDTH = 300;
@@ -627,7 +628,33 @@ export function drawPriorityAntenna(context, antenna, cellSize) {
 }
 
 /**
+ * Pixel where the dashed beam should end inside the last cell when stopping on a wall or board edge
+ * (empty termination square — not a robot hit).
+ * @param {number} col
+ * @param {number} row
+ * @param {number} direction - beam travel direction (same as shooter facing)
+ * @param {number} cellSize
+ * @param {'robot'|'antenna'|'wall'|'edge'|'none'} stopReason
+ */
+export function laserBeamTerminationPixel(col, row, direction, cellSize, stopReason) {
+  const half = cellSize / 2;
+  const cx = col * cellSize + half;
+  const cy = row * cellSize + half;
+  if (stopReason === "robot" || stopReason === "antenna" || stopReason === "none") {
+    return { x: cx, y: cy };
+  }
+  const inset = Math.max(2.5, cellSize * 0.08);
+  const { dCol, dRow } = directionDelta(direction);
+  return {
+    x: cx + dCol * (half - inset),
+    y: cy + dRow * (half - inset),
+  };
+}
+
+/**
  * Forward laser beams from each active robot (for UI); same geometry as engine raycast.
+ * Beams extend into the termination cell toward the wall or edge (not past it); round caps disabled so dashes
+ * do not overshoot board bounds.
  * @param {CanvasRenderingContext2D} context
  * @param {{ width: number, height: number, walls: object }} board
  * @param {{ col: number, row: number, direction: number, id: string, rebooted?: boolean }[]} robots
@@ -637,53 +664,39 @@ export function drawPriorityAntenna(context, antenna, cellSize) {
 export function drawLaserBeams(context, board, robots, cellSize, antenna) {
   context.save();
   context.lineWidth = 3;
-  context.lineCap = "round";
+  context.lineCap = "butt";
   context.setLineDash([4, 4]);
-  for (const robot of robots) {
-    if (robot.rebooted) continue;
-    if (robot.powerDownThisRound) continue;
-    const { path } = traceLaserPath(
-      board,
-      robots,
-      robot.col,
-      robot.row,
-      robot.direction,
-      robot.id,
-      antenna
-    );
-    if (path.length === 0) continue;
-    context.strokeStyle = "rgba(239, 68, 68, 0.55)";
-    const start = toPixelCenter(robot.col, robot.row, cellSize);
+
+  /** @param {number} sx @param {number} sy @param {string|undefined} excludeId @param {number} beamDir */
+  function strokeBeam(sx, sy, excludeId, beamDir) {
+    const { path, stopReason } = traceLaserPath(board, robots, sx, sy, beamDir, excludeId, antenna);
+    if (path.length === 0) return;
+    const start = toPixelCenter(sx, sy, cellSize);
     context.beginPath();
     context.moveTo(start.x, start.y);
-    for (const cell of path) {
-      const p = toPixelCenter(cell.col, cell.row, cellSize);
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i];
+      const last = i === path.length - 1;
+      const p = last
+        ? laserBeamTerminationPixel(cell.col, cell.row, beamDir, cellSize, stopReason)
+        : toPixelCenter(cell.col, cell.row, cellSize);
       context.lineTo(p.x, p.y);
     }
     context.stroke();
   }
+
+  context.strokeStyle = "rgba(239, 68, 68, 0.55)";
+  for (const robot of robots) {
+    if (robot.rebooted) continue;
+    if (robot.powerDownThisRound) continue;
+    strokeBeam(robot.col, robot.row, robot.id, robot.direction);
+  }
+
   const emitters = board.boardLasers;
   if (emitters?.length) {
     context.strokeStyle = "rgba(249, 115, 22, 0.65)";
     for (const em of emitters) {
-      const { path } = traceLaserPath(
-        board,
-        robots,
-        em.col,
-        em.row,
-        em.direction,
-        undefined,
-        antenna
-      );
-      if (path.length === 0) continue;
-      const start = toPixelCenter(em.col, em.row, cellSize);
-      context.beginPath();
-      context.moveTo(start.x, start.y);
-      for (const cell of path) {
-        const p = toPixelCenter(cell.col, cell.row, cellSize);
-        context.lineTo(p.x, p.y);
-      }
-      context.stroke();
+      strokeBeam(em.col, em.row, undefined, em.direction);
     }
   }
   context.restore();

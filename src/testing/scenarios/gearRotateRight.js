@@ -3,17 +3,17 @@ import { createInitialState } from "../../engine/gameState.js";
 import { runBoardElementStep } from "../../engine/postRegisterBoard.js";
 
 /** @type {import('../scenarioTypes.js').EngineTestScenario} */
-export const gearRotateLeft = {
-  id: "gear-rotate-left",
-  title: "Red gear rotates counterclockwise",
+export const gearRotateRight = {
+  id: "gear-rotate-right",
+  title: "Green gear rotates clockwise",
   module: "boardElements",
   description:
-    "Four gear resolutions on an L gear: 90° counterclockwise each time, completing a full turn.",
-  parityIds: ["PC-BEL-001"],
+    "Four gear resolutions on an R gear: 90° clockwise each time, completing a full turn.",
+  parityIds: ["PC-BEL-002"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
   buildState: () => {
     const board = createBoard(6, 6);
-    board.gears = { "2,2": "L" };
+    board.gears = { "2,2": "R" };
     return createInitialState({
       board,
       robots: [{ col: 2, row: 2, direction: 0 }],
@@ -29,6 +29,6 @@ export const gearRotateLeft = {
     const ok = r.direction === 0;
     return ok
       ? { ok: true }
-      : { ok: false, reason: `expected direction 0 (N) after four CCW quarter turns, got ${r.direction}` };
+      : { ok: false, reason: `expected direction 0 (N) after four CW quarter turns, got ${r.direction}` };
   },
 };
