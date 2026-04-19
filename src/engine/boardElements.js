@@ -83,16 +83,25 @@ export function advanceExpressBeltsOneStep(state) {
     }
 
     const beltFacing = board.conveyors[`${c},${r}`]?.direction;
+    const cornerDelta =
+      moved && beltFacing !== undefined ? (beltFacing - direction + 360) % 360 : null;
+    const shouldTurnOnCorner = cornerDelta === 90 || cornerDelta === 270;
     const patch = {};
     if (moved) {
       patch.col = c;
       patch.row = r;
     }
-    if (beltFacing !== undefined) patch.direction = beltFacing;
+    if (shouldTurnOnCorner) {
+      patch.direction =
+        cornerDelta === 90
+          ? (robot.direction + 90) % 360
+          : (robot.direction + 270) % 360;
+    }
     if (Object.keys(patch).length > 0) updates.set(robotId, patch);
   }
 
-  return applyRobotPatches(state, updates);
+  const nextState = applyRobotPatches(state, updates);
+  return nextState;
 }
 
 /**
