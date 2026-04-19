@@ -86,6 +86,8 @@ To add a new trace: build the board + program in a test, capture `normalizeActiv
 
 **Resolve order:** express belts run first (multi-step along express chains), then normal belts one step each ([`resolveConveyors`](../engine/boardElements.js)). When two express starters compete for the same downstream tile, iteration order over `board.conveyors` keys decides who moves first (documented in tests, not the physical rulebook).
 
+For stepped gallery helpers, `advanceExpressBeltsOneStep` / `advanceExpressBeltsTwoSteps` keep robot heading on straight runs and only apply heading changes at corner transitions.
+
 | Piece | Location |
 |-------|-----------|
 | Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `two express starters: iteration order decides merge tile`) |

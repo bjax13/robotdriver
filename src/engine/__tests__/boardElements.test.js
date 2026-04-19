@@ -112,6 +112,23 @@ describe('board elements', () => {
     expect(state.robots[0].row).toBe(2);
   });
 
+  it('advanceExpressBeltsOneStep keeps heading on straight express segments', () => {
+    const board = createBoard(8, 5);
+    board.conveyors = {
+      '1,2': { direction: 90, express: true },
+      '2,2': { direction: 90, express: true },
+    };
+    const state = createInitialState({
+      board,
+      robots: [{ col: 1, row: 2, direction: 0 }],
+      antenna: { col: 0, row: 0 },
+    });
+    const next = advanceExpressBeltsOneStep(state);
+    expect(next.robots[0].col).toBe(2);
+    expect(next.robots[0].row).toBe(2);
+    expect(next.robots[0].direction).toBe(0);
+  });
+
   it('two consecutive express tiles chain to two spaces along belt direction', () => {
     const board = createBoard(6, 5);
     board.conveyors = {
@@ -369,7 +386,7 @@ describe('board elements', () => {
       expect(updates.get('r1')).toEqual({ col: 7, row: 6, direction: 90 });
     });
 
-    it('sixteen advanceExpressBeltsOneStep calls match one resolveConveyors for the express loop', () => {
+    it('express loop heading differs: stepped helper preserves heading, resolveConveyors aligns to final belt arrow', () => {
       const board = createBoard(14, 14);
       board.conveyors = {
         '7,6': { direction: 90, express: true },
@@ -411,7 +428,10 @@ describe('board elements', () => {
         }
         return next;
       });
-      expect(micro.robots[0]).toEqual(once[0]);
+      expect(micro.robots[0].col).toBe(7);
+      expect(micro.robots[0].row).toBe(6);
+      expect(micro.robots[0].direction).toBe(180);
+      expect(once[0]).toMatchObject({ col: 7, row: 6, direction: 90 });
     });
 
     it('normal belt loop: sixteen conveyors steps complete one lap and face the start tile', () => {
