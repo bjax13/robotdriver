@@ -8,6 +8,7 @@ import {
   turn,
   directionDelta,
 } from '../movement.js';
+import { createInitialState, applyMove } from '../gameState.js';
 
 describe('movement', () => {
   const emptyOccupied = new Set();
@@ -94,6 +95,22 @@ describe('movement', () => {
     it('uturn adds 180', () => {
       expect(turn(0, 'uturn')).toBe(180);
       expect(turn(90, 'uturn')).toBe(270);
+    });
+  });
+
+  describe('applyMove uturn', () => {
+    it('four uturns restore original heading and position', () => {
+      let s = createInitialState({
+        board: createBoard(6, 6),
+        robots: [{ col: 2, row: 2, direction: 0 }],
+        antenna: { col: 0, row: 0 },
+      });
+      for (let i = 0; i < 4; i += 1) {
+        s = applyMove(s, 'r1', 'uturn');
+      }
+      expect(s.robots[0].direction).toBe(0);
+      expect(s.robots[0].col).toBe(2);
+      expect(s.robots[0].row).toBe(2);
     });
   });
 
