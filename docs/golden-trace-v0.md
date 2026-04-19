@@ -5,7 +5,9 @@ Machine-readable regression artifacts for activation ordering and laser resoluti
 ## Files
 
 - [`golden-trace-v0.schema.json`](golden-trace-v0.schema.json) — JSON Schema (draft-07).
-- Checked-in fixtures under `src/engine/__fixtures__/golden/` — frozen expected event streams.
+- Checked-in fixtures under `src/engine/__fixtures__/golden/` — frozen expected event streams:
+  - [`trace-v0-priority-laser.json`](../src/engine/__fixtures__/golden/trace-v0-priority-laser.json) — antenna priority + robot laser.
+  - [`trace-v0-mix-conveyor-laser-checkpoint.json`](../src/engine/__fixtures__/golden/trace-v0-mix-conveyor-laser-checkpoint.json) — conveyor chain, stacked laser audit (robot + wall), checkpoint in one register.
 
 ## Top-level shape
 

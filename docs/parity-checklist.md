@@ -84,6 +84,14 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 ---
 
+## goldenTrace
+
+| ID | Rule / behavior | Status | Evidence |
+|----|-------------------|--------|----------|
+| PC-GTR-001 | Golden trace v0: `normalizeActivationEventsToGoldenV0` matches replay of `activateRegisterWithEvents` for checked-in fixtures (ordering, laser audit stream, single `board_resolve` cap) | draft | [`goldenTrace.test.js`](../src/engine/__tests__/goldenTrace.test.js) · fixtures [`trace-v0-priority-laser.json`](../src/engine/__fixtures__/golden/trace-v0-priority-laser.json), [`trace-v0-mix-conveyor-laser-checkpoint.json`](../src/engine/__fixtures__/golden/trace-v0-mix-conveyor-laser-checkpoint.json) · [`docs/golden-trace-v0.md`](golden-trace-v0.md) · scenario doc: [`src/testing/README.md`](../src/testing/README.md) (section **Reference example (golden trace v0)**) |
+
+---
+
 ## lasers
 
 | ID | Rule / behavior | Status | Evidence |
