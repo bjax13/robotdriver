@@ -32,7 +32,7 @@ function stepLabel(i) {
   if (n === 2) return "Express 2/8 — past northeast corner, south on east edge";
   if (n === 4) return "Express 4/8 — past southeast corner, west on south edge";
   if (n === 6) return "Express 6/8 — past southwest corner, north on west edge";
-  if (n === 8) return "Express 8/8 — lap complete (16 cells), facing east";
+  if (n === 8) return "Express 8/8 — lap complete (16 cells), heading preserved";
   return `Express ${n}/8 — two express tiles per step (yellow 2× chain)`;
 }
 
@@ -65,10 +65,10 @@ export const conveyorBeltLoop = {
         reason: `expected robot back at (7,6), got (${r.col},${r.row})`,
       };
     }
-    if (r.direction !== 90) {
+    if (r.direction !== 180) {
       return {
         ok: false,
-        reason: `expected direction 90° (east, start belt arrow), got ${r.direction}`,
+        reason: `expected direction 180° (south, preserved after full loop), got ${r.direction}`,
       };
     }
     return { ok: true };
