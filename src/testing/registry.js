@@ -5,6 +5,8 @@ import { pushChainWallBlock } from "./scenarios/pushChainWallBlock.js";
 import { priorityTieBreak } from "./scenarios/priorityTieBreak.js";
 import { conveyorExpressOneTile } from "./scenarios/conveyorExpressOneTile.js";
 import { conveyorExpressTwoTiles } from "./scenarios/conveyorExpressTwoTiles.js";
+import { conveyorExpressLChain } from "./scenarios/conveyorExpressLChain.js";
+import { conveyorExpressMergeRace } from "./scenarios/conveyorExpressMergeRace.js";
 import { conveyorExpressBeforeNormal } from "./scenarios/conveyorExpressBeforeNormal.js";
 import { conveyorThenPushPanel } from "./scenarios/conveyorThenPushPanel.js";
 import { conveyorNormalOne } from "./scenarios/conveyorNormalOne.js";
@@ -27,6 +29,8 @@ export const testScenarios = [
   priorityTieBreak,
   conveyorExpressOneTile,
   conveyorExpressTwoTiles,
+  conveyorExpressLChain,
+  conveyorExpressMergeRace,
   conveyorExpressBeforeNormal,
   conveyorThenPushPanel,
   conveyorNormalOne,

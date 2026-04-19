@@ -90,7 +90,7 @@ To add a new trace: build the board + program in a test, capture `normalizeActiv
 |-------|-----------|
 | Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `two express starters: iteration order decides merge tile`) |
 | Parity | `PC-BEL-001` in [`docs/parity-checklist.md`](../../docs/parity-checklist.md) |
-| Gallery URL | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(multi-tile chain)* |
+| Gallery URLs | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(express before normal)* |
 
 ## Reference example (activation invariants — headless stress)
 
