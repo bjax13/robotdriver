@@ -233,6 +233,103 @@ function drawBeltChevronStrip(context, cx, cy, forward, perp, scale, phase) {
 }
 
 /**
+ * Directions that feed into (col,row) from a neighbor belt pointing this way onto our cell.
+ * @param {{ conveyors?: Record<string, { direction: number }> }} board
+ */
+function conveyorFeedIns(board, col, row) {
+  const c = board.conveyors;
+  if (!c) return [];
+  const out = [];
+  if (c[`${col - 1},${row}`]?.direction === 90) out.push(90);
+  if (c[`${col + 1},${row}`]?.direction === 270) out.push(270);
+  if (c[`${col},${row - 1}`]?.direction === 180) out.push(180);
+  if (c[`${col},${row + 1}`]?.direction === 0) out.push(0);
+  return out;
+}
+
+/**
+ * Quarter-circle arc for a 90° turn. `feedIn` / `exitDir` are board directions (0=N…).
+ * @returns {{ cx: number, cy: number, r: number, startAngle: number, endAngle: number, counterclockwise: boolean } | null}
+ */
+function beltCornerArc(feedIn, exitDir, cellLeft, cellTop, inner) {
+  const S = inner;
+  const L = cellLeft;
+  const T = cellTop;
+  const MW = { x: L, y: T + S / 2 };
+  const ME = { x: L + S, y: T + S / 2 };
+  const MN = { x: L + S / 2, y: T };
+  const MS = { x: L + S / 2, y: T + S };
+  const TL = { x: L, y: T };
+  const TR = { x: L + S, y: T };
+  const BL = { x: L, y: T + S };
+  const BR = { x: L + S, y: T + S };
+
+  const delta = ((exitDir - feedIn + 360) % 360);
+  if (delta !== 90 && delta !== 270) return null;
+
+  /** Entry/exit midpoints for each turn; centers are cell inner corners equidistant to both. */
+  /** @type {Record<string, { c: {x:number,y:number}, p1: {x:number,y:number}, p2: {x:number,y:number}, ccw: boolean }>} */
+  const turns = {
+    // ∆=+90° (clockwise around the obstacle in typical loop layouts)
+    "90_180": { c: BL, p1: MW, p2: MS, ccw: false },
+    "180_270": { c: TL, p1: MN, p2: MW, ccw: false },
+    "270_0": { c: TR, p1: ME, p2: MN, ccw: false },
+    "0_90": { c: BR, p1: MS, p2: ME, ccw: false },
+    // ∆=+270° mod 360 (= left turn)
+    "90_0": { c: TL, p1: MW, p2: MN, ccw: true },
+    "180_90": { c: TR, p1: MN, p2: ME, ccw: true },
+    "270_180": { c: BR, p1: ME, p2: MS, ccw: true },
+    "0_270": { c: BL, p1: MS, p2: MW, ccw: true },
+  };
+  const spec = turns[`${feedIn}_${exitDir}`];
+  if (!spec) return null;
+  const { c, p1, p2, ccw } = spec;
+  const r = Math.hypot(p1.x - c.x, p1.y - c.y);
+  const startAngle = Math.atan2(p1.y - c.y, p1.x - c.x);
+  const endAngle = Math.atan2(p2.y - c.y, p2.x - c.x);
+  return { cx: c.x, cy: c.y, r, startAngle, endAngle, counterclockwise: ccw };
+}
+
+/**
+ * Chevrons along a circular arc (two parallel arcs when `laneOffsets` has two values).
+ * @param {number} phase - scroll phase 0..1
+ * @param {number | number[]} laneOffsets - perpendicular offset(s) from arc radius
+ */
+function drawBeltArcChevronStrip(context, arc, baseScale, phase, laneOffsets) {
+  const { cx, cy, r, startAngle, endAngle } = arc;
+  let sweep = endAngle - startAngle;
+  while (sweep <= -Math.PI) sweep += 2 * Math.PI;
+  while (sweep > Math.PI) sweep -= 2 * Math.PI;
+
+  const offsets = Array.isArray(laneOffsets) ? laneOffsets : [laneOffsets];
+  const pitch = baseScale * 0.52;
+  const chevScale = baseScale * 0.62;
+  const wrapped = ((phase % 1) + 1) % 1;
+  const shift = wrapped * pitch;
+
+  for (const off of offsets) {
+    const rr = r + off;
+    const arcLen = Math.abs(sweep) * rr;
+    const span = arcLen + pitch * 8;
+    const kMin = Math.ceil(-span / pitch - 4);
+    const kMax = Math.floor(span / pitch + 4);
+    for (let k = kMin; k <= kMax; k++) {
+      const along = k * pitch - shift;
+      let u = arcLen > 1e-6 ? along / arcLen : 0;
+      const ang = startAngle + sweep * u;
+      const dpx = -Math.sin(ang) * sweep;
+      const dpy = Math.cos(ang) * sweep;
+      const mag = Math.hypot(dpx, dpy) || 1;
+      const forward = { ux: dpx / mag, uy: dpy / mag };
+      const perp = { ux: -forward.uy, uy: forward.ux };
+      const px = cx + rr * Math.cos(ang);
+      const py = cy + rr * Math.sin(ang);
+      drawBeltChevron(context, px, py, forward, perp, chevScale);
+    }
+  }
+}
+
+/**
  * Standard and express conveyor belts (engine: direction 0–270, express = 2 steps).
  * @param {CanvasRenderingContext2D} context
  * @param {{ width: number, height: number, conveyors?: Record<string, { direction: number, express?: boolean }> }} board
@@ -269,67 +366,196 @@ export function drawConveyors(context, board, cellSize, beltPhase) {
     context.fill();
 
     context.fillStyle = express ? "#a16207" : "#475569";
-    if (animate) {
-      const phase = /** @type {number} */ (beltPhase);
-      context.save();
-      context.beginPath();
-      context.rect(cellLeft, cellTop, cellInner, cellInner);
-      context.clip();
-      if (express) {
-        drawBeltChevronStrip(
+
+    const feeds = conveyorFeedIns(board, col, row);
+    const feedIn = feeds.length === 1 ? feeds[0] : null;
+    const exitDir = conv.direction;
+    const cornerArc =
+      feedIn !== null && feedIn !== exitDir
+        ? beltCornerArc(feedIn, exitDir, cellLeft, cellTop, cellInner)
+        : null;
+
+    const drawStraight = () => {
+      if (animate) {
+        const phase = /** @type {number} */ (beltPhase);
+        context.save();
+        context.beginPath();
+        context.rect(cellLeft, cellTop, cellInner, cellInner);
+        context.clip();
+        if (express) {
+          drawBeltChevronStrip(
+            context,
+            cx - perp.ux * spacing,
+            cy - perp.uy * spacing,
+            forward,
+            perp,
+            baseScale,
+            phase
+          );
+          drawBeltChevronStrip(
+            context,
+            cx + perp.ux * spacing,
+            cy + perp.uy * spacing,
+            forward,
+            perp,
+            baseScale,
+            phase
+          );
+        } else {
+          drawBeltChevronStrip(context, cx, cy, forward, perp, baseScale, phase);
+        }
+        context.restore();
+      } else if (express) {
+        drawBeltChevron(
           context,
           cx - perp.ux * spacing,
           cy - perp.uy * spacing,
           forward,
           perp,
-          baseScale,
-          phase
+          baseScale
         );
-        drawBeltChevronStrip(
+        drawBeltChevron(
           context,
           cx + perp.ux * spacing,
           cy + perp.uy * spacing,
           forward,
           perp,
-          baseScale,
-          phase
+          baseScale
         );
       } else {
-        drawBeltChevronStrip(context, cx, cy, forward, perp, baseScale, phase);
+        drawBeltChevron(context, cx, cy, forward, perp, baseScale);
+      }
+    };
+
+    /** Two or more neighboring belts feed this tile — draw chevrons on each incoming arm plus outgoing. */
+    const drawMerge = () => {
+      const phaseVal = animate ? /** @type {number} */ (beltPhase) : 0;
+      const hubDist = cellInner * 0.26;
+      const hubX = cx - forward.ux * hubDist;
+      const hubY = cy - forward.uy * hubDist;
+      const incScale = baseScale * 0.88;
+
+      /** @param {number} fd */
+      const entryMidForFeed = (fd) => {
+        const L = cellLeft;
+        const T = cellTop;
+        const S = cellInner;
+        if (fd === 90) return { x: L, y: T + S / 2 };
+        if (fd === 270) return { x: L + S, y: T + S / 2 };
+        if (fd === 180) return { x: L + S / 2, y: T };
+        if (fd === 0) return { x: L + S / 2, y: T + S };
+        return { x: cx, y: cy };
+      };
+
+      context.save();
+      context.beginPath();
+      context.rect(cellLeft, cellTop, cellInner, cellInner);
+      context.clip();
+
+      const sortedFeeds = [...feeds].sort((a, b) => a - b);
+      for (const fd of sortedFeeds) {
+        const em = entryMidForFeed(fd);
+        const inf = boardDirectionUnit(fd);
+        const inPerp = { ux: -inf.uy, uy: inf.ux };
+        const midX = (em.x + hubX) / 2;
+        const midY = (em.y + hubY) / 2;
+        drawBeltChevronStrip(context, midX, midY, inf, inPerp, incScale, phaseVal);
+      }
+
+      if (animate) {
+        if (express) {
+          drawBeltChevronStrip(
+            context,
+            cx - perp.ux * spacing,
+            cy - perp.uy * spacing,
+            forward,
+            perp,
+            baseScale,
+            phaseVal
+          );
+          drawBeltChevronStrip(
+            context,
+            cx + perp.ux * spacing,
+            cy + perp.uy * spacing,
+            forward,
+            perp,
+            baseScale,
+            phaseVal
+          );
+        } else {
+          drawBeltChevronStrip(
+            context,
+            cx,
+            cy,
+            forward,
+            perp,
+            baseScale,
+            phaseVal
+          );
+        }
+      } else if (express) {
+        drawBeltChevron(
+          context,
+          cx - perp.ux * spacing,
+          cy - perp.uy * spacing,
+          forward,
+          perp,
+          baseScale
+        );
+        drawBeltChevron(
+          context,
+          cx + perp.ux * spacing,
+          cy + perp.uy * spacing,
+          forward,
+          perp,
+          baseScale
+        );
+      } else {
+        drawBeltChevron(context, cx, cy, forward, perp, baseScale);
       }
       context.restore();
-      if (express) {
-        context.fillStyle = "#92400e";
-        context.font = `bold ${Math.round(cellSize * 0.22)}px sans-serif`;
-        context.textAlign = "center";
-        context.textBaseline = "bottom";
-        context.fillText("2×", cx, row * cellSize + cellSize - 3);
-      }
-    } else if (express) {
-      drawBeltChevron(
-        context,
-        cx - perp.ux * spacing,
-        cy - perp.uy * spacing,
-        forward,
-        perp,
-        baseScale
+    };
+
+    const drawCorner = () => {
+      const arc = /** @type {NonNullable<typeof cornerArc>} */ (cornerArc);
+      const phase = animate ? /** @type {number} */ (beltPhase) : 0;
+      context.save();
+      context.beginPath();
+      context.rect(cellLeft, cellTop, cellInner, cellInner);
+      context.clip();
+      const lanes = express ? [-spacing, spacing] : [0];
+      drawBeltArcChevronStrip(context, arc, baseScale, phase, lanes);
+      context.strokeStyle = express ? "rgba(113, 63, 18, 0.42)" : "rgba(51, 65, 85, 0.4)";
+      context.lineWidth = Math.max(1.5, cellSize * 0.055);
+      context.beginPath();
+      context.arc(
+        arc.cx,
+        arc.cy,
+        arc.r,
+        arc.startAngle,
+        arc.endAngle,
+        arc.counterclockwise
       );
-      drawBeltChevron(
-        context,
-        cx + perp.ux * spacing,
-        cy + perp.uy * spacing,
-        forward,
-        perp,
-        baseScale
-      );
+      context.stroke();
+      context.restore();
+    };
+
+    if (feeds.length >= 2) {
+      drawMerge();
+    } else if (cornerArc) {
+      drawCorner();
+    } else {
+      drawStraight();
+    }
+
+    if (express) {
       context.fillStyle = "#92400e";
       context.font = `bold ${Math.round(cellSize * 0.22)}px sans-serif`;
       context.textAlign = "center";
       context.textBaseline = "bottom";
       context.fillText("2×", cx, row * cellSize + cellSize - 3);
-    } else {
-      drawBeltChevron(context, cx, cy, forward, perp, baseScale);
     }
+
     context.restore();
   }
 }

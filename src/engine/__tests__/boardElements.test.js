@@ -2,7 +2,12 @@ import { createBoard } from '../board.js';
 import { createInitialState } from '../gameState.js';
 import { dealHands, setProgram, activateRound, activateRegister } from '../activation.js';
 import { CARD_TYPES } from '../cards.js';
-import { resolvePushPanels, resolveConveyors, resolveGears } from '../boardElements.js';
+import {
+  resolvePushPanels,
+  resolveConveyors,
+  resolveGears,
+  advanceExpressBeltsOneStep,
+} from '../boardElements.js';
 import { runBoardElementStep } from '../postRegisterBoard.js';
 
 describe('board elements', () => {
@@ -334,6 +339,132 @@ describe('board elements', () => {
     /**
      * Express chains must follow each tile's arrow (merge / corner tiles), not only straight runs.
      */
+    it('express belt loop moves one lap and faces the starting belt arrow', () => {
+      const board = createBoard(14, 14);
+      board.conveyors = {
+        '7,6': { direction: 90, express: true },
+        '8,6': { direction: 90, express: true },
+        '9,6': { direction: 90, express: true },
+        '10,6': { direction: 180, express: true },
+        '10,7': { direction: 180, express: true },
+        '10,8': { direction: 180, express: true },
+        '10,9': { direction: 180, express: true },
+        '10,10': { direction: 270, express: true },
+        '9,10': { direction: 270, express: true },
+        '8,10': { direction: 270, express: true },
+        '7,10': { direction: 270, express: true },
+        '6,10': { direction: 0, express: true },
+        '6,9': { direction: 0, express: true },
+        '6,8': { direction: 0, express: true },
+        '6,7': { direction: 0, express: true },
+        '6,6': { direction: 90, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 7, row: 6, direction: 270 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['7,6', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toEqual({ col: 7, row: 6, direction: 90 });
+    });
+
+    it('sixteen advanceExpressBeltsOneStep calls match one resolveConveyors for the express loop', () => {
+      const board = createBoard(14, 14);
+      board.conveyors = {
+        '7,6': { direction: 90, express: true },
+        '8,6': { direction: 90, express: true },
+        '9,6': { direction: 90, express: true },
+        '10,6': { direction: 180, express: true },
+        '10,7': { direction: 180, express: true },
+        '10,8': { direction: 180, express: true },
+        '10,9': { direction: 180, express: true },
+        '10,10': { direction: 270, express: true },
+        '9,10': { direction: 270, express: true },
+        '8,10': { direction: 270, express: true },
+        '7,10': { direction: 270, express: true },
+        '6,10': { direction: 0, express: true },
+        '6,9': { direction: 0, express: true },
+        '6,8': { direction: 0, express: true },
+        '6,7': { direction: 0, express: true },
+        '6,6': { direction: 90, express: true },
+      };
+      const base = createInitialState({
+        board,
+        robots: [{ col: 7, row: 6, direction: 180 }],
+        antenna: { col: 0, row: 0 },
+      });
+      let micro = base;
+      for (let i = 0; i < 16; i += 1) micro = advanceExpressBeltsOneStep(micro);
+
+      const cellToRobotId = new Map();
+      for (const r of base.robots) {
+        if (!r.rebooted) cellToRobotId.set(`${r.col},${r.row}`, r.id);
+      }
+      const { updates } = resolveConveyors(base, cellToRobotId);
+      const once = base.robots.map((robot) => {
+        const u = updates.get(robot.id);
+        if (!u) return robot;
+        const next = { ...robot };
+        for (const k of ['col', 'row', 'direction']) {
+          if (u[k] !== undefined) next[k] = u[k];
+        }
+        return next;
+      });
+      expect(micro.robots[0]).toEqual(once[0]);
+    });
+
+    it('normal belt loop: sixteen conveyors steps complete one lap and face the start tile', () => {
+      const board = createBoard(14, 14);
+      board.conveyors = {
+        '7,6': { direction: 90, express: false },
+        '8,6': { direction: 90, express: false },
+        '9,6': { direction: 90, express: false },
+        '10,6': { direction: 180, express: false },
+        '10,7': { direction: 180, express: false },
+        '10,8': { direction: 180, express: false },
+        '10,9': { direction: 180, express: false },
+        '10,10': { direction: 270, express: false },
+        '9,10': { direction: 270, express: false },
+        '8,10': { direction: 270, express: false },
+        '7,10': { direction: 270, express: false },
+        '6,10': { direction: 0, express: false },
+        '6,9': { direction: 0, express: false },
+        '6,8': { direction: 0, express: false },
+        '6,7': { direction: 0, express: false },
+        '6,6': { direction: 90, express: false },
+      };
+      let state = createInitialState({
+        board,
+        robots: [{ col: 7, row: 6, direction: 180 }],
+        antenna: { col: 0, row: 0 },
+      });
+      for (let i = 0; i < 16; i += 1) {
+        state = runBoardElementStep(state, 0, 'conveyors').state;
+      }
+      const r = state.robots[0];
+      expect(r.col).toBe(7);
+      expect(r.row).toBe(6);
+      expect(r.direction).toBe(90);
+    });
+
+    it('express corner chain ends on floor past last belt — position update only (no belt on exit cell)', () => {
+      const board = createBoard(8, 8);
+      board.conveyors = {
+        '1,3': { direction: 90, express: true },
+        '2,3': { direction: 180, express: true },
+        '2,4': { direction: 90, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 1, row: 3, direction: 0 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['1,3', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toEqual({ col: 3, row: 4 });
+    });
+
     it('express chain follows corners: three express tiles east then south lands two steps past the bend', () => {
       const board = createBoard(8, 8);
       board.conveyors = {
@@ -357,6 +488,33 @@ describe('board elements', () => {
       state = activateRound(state);
       expect(state.robots[0].col).toBe(3);
       expect(state.robots[0].row).toBe(4);
+    });
+
+    it('express open Z chain: straights plus E/S/E/N corners resolve in one conveyors step', () => {
+      const board = createBoard(10, 8);
+      board.conveyors = {
+        '1,2': { direction: 90, express: true },
+        '2,2': { direction: 90, express: true },
+        '3,2': { direction: 90, express: true },
+        '4,2': { direction: 180, express: true },
+        '4,3': { direction: 180, express: true },
+        '4,4': { direction: 180, express: true },
+        '4,5': { direction: 90, express: true },
+        '5,5': { direction: 90, express: true },
+        '6,5': { direction: 90, express: true },
+        '7,5': { direction: 90, express: true },
+        '8,5': { direction: 0, express: true },
+        '8,4': { direction: 0, express: true },
+        '8,3': { direction: 0, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 1, row: 2, direction: 0 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['1,2', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toEqual({ col: 8, row: 2 });
     });
 
     it('four consecutive straight express tiles move four cells in belt direction', () => {
@@ -409,7 +567,8 @@ describe('board elements', () => {
       ]);
       const { updates } = resolveConveyors(state, cellToRobotId);
       expect(updates.get('r1')).toEqual({ col: 2, row: 2 });
-      expect(updates.get('r2')).toBeUndefined();
+      // r2 does not move but still realigns to the belt on (2,3)
+      expect(updates.get('r2')).toEqual({ direction: 0 });
     });
 
     it('same merge conflict with conveyor map order swapped: second-listed belt reaches merge first', () => {
@@ -432,7 +591,7 @@ describe('board elements', () => {
       ]);
       const { updates } = resolveConveyors(state, cellToRobotId);
       expect(updates.get('r2')).toEqual({ col: 2, row: 2 });
-      expect(updates.get('r1')).toBeUndefined();
+      expect(updates.get('r1')).toEqual({ direction: 90 });
     });
 
     /**
@@ -551,7 +710,8 @@ describe('board elements', () => {
     });
     const cellToRobotId = new Map([['2,2', 'r1']]);
     const { updates } = resolveConveyors(state, cellToRobotId);
-    expect(updates.size).toBe(0);
+    // Blocked by wall: no move, but robot still faces the belt arrow
+    expect(updates.get('r1')).toEqual({ direction: 90 });
   });
 
   it('checkpoint advances and winner is set', () => {

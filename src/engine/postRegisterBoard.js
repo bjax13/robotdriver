@@ -78,7 +78,7 @@ export function runBoardElementStep(state, registerIndex, step) {
       break;
     case 'conveyors': {
       const { updates: convUpdates } = resolveConveyors(s, cellToRobotId());
-      applyUpdates(convUpdates, ['col', 'row']);
+      applyUpdates(convUpdates, ['col', 'row', 'direction']);
       break;
     }
     case 'gears': {

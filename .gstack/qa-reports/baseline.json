@@ -1,24 +1,27 @@
 {
-  "date": "2026-04-18",
+  "date": "2026-04-19",
   "url": "http://localhost:3000/",
-  "healthScore": 94,
+  "branch": "main",
+  "commit": "c897d90",
+  "healthScore": 93,
   "issues": [
     {
-      "id": "ISSUE-001",
-      "title": "Load course button hit target broken when course panel collapsed",
-      "severity": "medium",
-      "category": "functional",
-      "fixCommit": "cb55948"
+      "id": "ISSUE-003",
+      "title": "React Router v7 future-flag warnings appear as console errors",
+      "severity": "low",
+      "category": "console",
+      "fixCommit": null
     }
   ],
   "categoryScores": {
-    "console": 100,
+    "console": 70,
     "links": 100,
-    "visual": 92,
-    "functional": 92,
-    "ux": 90,
-    "performance": 95,
-    "content": 95,
+    "visual": 100,
+    "functional": 100,
+    "ux": 98,
+    "performance": 100,
+    "content": 100,
     "accessibility": 88
-  }
+  },
+  "notes": "Testing gallery 21/21 PASS; conveyors smoke PASS; Deal Hand smoke PASS"
 }

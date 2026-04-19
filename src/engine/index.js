@@ -28,7 +28,13 @@ export {
 } from './activation.js';
 export { pickProgram } from './autoplay.js';
 export { shortestGridDistance } from './pathDistance.js';
-export { resolveConveyors, resolveGears, resolvePushPanels } from './boardElements.js';
+export {
+  resolveConveyors,
+  resolveGears,
+  resolvePushPanels,
+  advanceExpressBeltsOneStep,
+  advanceExpressBeltsTwoSteps,
+} from './boardElements.js';
 export {
   runPostRegisterBoardElements,
   runBoardElementStep,
