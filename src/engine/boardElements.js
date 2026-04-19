@@ -11,8 +11,11 @@ import { inBounds, hasWall } from './board.js';
 import { directionDelta } from './movement.js';
 
 /**
- * Resolve conveyors: express first (2 spaces), then normal (1 space).
- * Robots that end on conveyor move. Conveyor into occupied non-belt: stop.
+ * Resolve conveyors: express first, then normal.
+ * Express: move along consecutive express tiles (same phase), one grid step per tile,
+ * following each tile's direction until leaving the express belt chain (Robo Rally style).
+ * Normal: one step along that belt's direction (existing single-step behavior).
+ * Conveyor into occupied cell: stop.
  * @param {import('./types').GameState} state
  * @param {Map<string, string>} cellToRobotId - "col,row" -> robotId
  * @returns {{ updates: Map<string, { col: number, row: number }> }}
@@ -33,29 +36,61 @@ export function resolveConveyors(state, cellToRobotId) {
     else normal.push({ col, row, robotId, ...conv });
   }
 
-  for (const list of [express, normal]) {
-    const steps = list[0]?.express ? 2 : 1;
-    for (const { col, row, robotId, direction } of list) {
+  for (const { col: startCol, row: startRow, robotId } of express) {
+    const startKey = `${startCol},${startRow}`;
+    if (cellToRobotId.get(startKey) !== robotId) continue;
+
+    let c = startCol;
+    let r = startRow;
+    let moved = 0;
+
+    while (true) {
+      const hereKey = `${c},${r}`;
+      const convHere = board.conveyors?.[hereKey];
+      if (!convHere?.express) break;
+
+      const direction = convHere.direction;
+      if (hasWall(board, c, r, direction)) break;
       const { dCol, dRow } = directionDelta(direction);
-      let c = col;
-      let r = row;
-      let moved = 0;
-      for (let s = 0; s < steps; s++) {
-        if (hasWall(board, c, r, direction)) break;
-        const nextC = c + dCol;
-        const nextR = r + dRow;
-        if (!inBounds(board, nextC, nextR)) break;
-        const nextKey = `${nextC},${nextR}`;
-        if (cellToRobotId.get(nextKey)) break;
-        c = nextC;
-        r = nextR;
-        moved++;
-      }
-      if (moved > 0) {
-        updates.set(robotId, { col: c, row: r });
-        cellToRobotId.delete(`${col},${row}`);
-        cellToRobotId.set(`${c},${r}`, robotId);
-      }
+      const nextC = c + dCol;
+      const nextR = r + dRow;
+      if (!inBounds(board, nextC, nextR)) break;
+      const nextKey = `${nextC},${nextR}`;
+      if (cellToRobotId.get(nextKey)) break;
+
+      c = nextC;
+      r = nextR;
+      moved++;
+    }
+
+    if (moved > 0) {
+      updates.set(robotId, { col: c, row: r });
+      cellToRobotId.delete(startKey);
+      cellToRobotId.set(`${c},${r}`, robotId);
+    }
+  }
+
+  for (const { col, row, robotId, direction } of normal) {
+    const { dCol, dRow } = directionDelta(direction);
+    let c = col;
+    let r = row;
+    let moved = 0;
+    const steps = 1;
+    for (let s = 0; s < steps; s++) {
+      if (hasWall(board, c, r, direction)) break;
+      const nextC = c + dCol;
+      const nextR = r + dRow;
+      if (!inBounds(board, nextC, nextR)) break;
+      const nextKey = `${nextC},${nextR}`;
+      if (cellToRobotId.get(nextKey)) break;
+      c = nextC;
+      r = nextR;
+      moved++;
+    }
+    if (moved > 0) {
+      updates.set(robotId, { col: c, row: r });
+      cellToRobotId.delete(`${col},${row}`);
+      cellToRobotId.set(`${c},${r}`, robotId);
     }
   }
   return { updates };

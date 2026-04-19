@@ -351,6 +351,7 @@ function applyAutoplayProgramsToState(state, seedStr, rngMix, opts = {}) {
 
 function GameView() {
   const canvasRef = useRef(null);
+  const beltPhaseRef = useRef(0);
   const eventLogRef = useRef(null);
   const [gameState, dispatch] = useReducer(gameReducer, initialState);
   const [selectedRobotId, setSelectedRobotId] = useState("r1");
@@ -587,7 +588,7 @@ function GameView() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(displayState.board, CELL_SIZE);
     drawWalls(context, walls);
-    drawConveyors(context, displayState.board, CELL_SIZE);
+    drawConveyors(context, displayState.board, CELL_SIZE, beltPhaseRef.current);
     drawGears(context, displayState.board, CELL_SIZE);
     drawCheckpoints(context, displayState.board, CELL_SIZE);
     drawStartSlotLabels(context, displayState.board, CELL_SIZE);
@@ -609,11 +610,17 @@ function GameView() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = CANVAS_WIDTH;
-      canvas.height = CANVAS_HEIGHT;
+    if (!canvas) return undefined;
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    let frame = 0;
+    const loop = () => {
+      beltPhaseRef.current = (performance.now() % 2000) / 2000;
       redrawCanvas();
-    }
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frame);
   }, [redrawCanvas]);
 
   const goNextRef = useRef(goNextRegister);

@@ -3,35 +3,34 @@ import { createInitialState } from "../../engine/gameState.js";
 import { runBoardElementStep } from "../../engine/postRegisterBoard.js";
 
 /** @type {import('../scenarioTypes.js').EngineTestScenario} */
-export const conveyorNormalOne = {
-  id: "conveyor-normal-one",
-  title: "Normal conveyor moves one cell",
+export const conveyorExpressOneTile = {
+  id: "conveyor-express-one-tile",
+  title: "Single express belt moves one cell",
   module: "boardElements",
   description:
-    "A robot on a non-express belt moves one space in the belt direction when the conveyors step runs. The belt graphic scrolls in a loop to show motion along the arrow.",
+    "One express conveyor tile pushes the robot one step along its arrow—the end of that belt—not two arbitrary spaces.",
   parityIds: ["PC-BEL-001"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
-  initialTraceLabel: "Before conveyors — scrolling belt; robot still on this cell",
   buildState: () => {
     const board = createBoard(10, 6);
     board.conveyors = {
-      "2,2": { direction: 180, express: false },
+      "1,1": { direction: 90, express: true },
     };
     return createInitialState({
       board,
-      robots: [{ col: 2, row: 2, direction: 0 }],
+      robots: [{ col: 1, row: 1, direction: 0 }],
       antenna: { col: 0, row: 0 },
     });
   },
   steps: [
     {
-      label: "Conveyors resolve — belt carries the robot one cell (south, with the arrow)",
+      label: "Resolve conveyors",
       apply: (s) => runBoardElementStep(s, 0, "conveyors").state,
     },
   ],
   assert: (s) => {
     const r = s.robots[0];
-    const ok = r.col === 2 && r.row === 3;
-    return ok ? { ok: true } : { ok: false, reason: `expected robot at (2,3), got (${r.col},${r.row})` };
+    const ok = r.col === 2 && r.row === 1;
+    return ok ? { ok: true } : { ok: false, reason: `expected robot at (2,1), got (${r.col},${r.row})` };
   },
 };

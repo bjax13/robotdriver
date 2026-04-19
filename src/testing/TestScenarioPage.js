@@ -28,6 +28,7 @@ export default function TestScenarioPage() {
   const scenario = useMemo(() => testScenarios.find((s) => s.id === id), [id]);
 
   const canvasRef = useRef(null);
+  const beltPhaseRef = useRef(0);
 
   const { trace, headlessResult } = useMemo(() => {
     if (!scenario) return { trace: [], headlessResult: null };
@@ -81,7 +82,7 @@ export default function TestScenarioPage() {
     drawGrid(context, canvas.width, canvas.height, CELL_SIZE);
     const walls = boardToWallSegments(state.board, CELL_SIZE);
     drawWalls(context, walls);
-    drawConveyors(context, state.board, CELL_SIZE);
+    drawConveyors(context, state.board, CELL_SIZE, beltPhaseRef.current);
     drawGears(context, state.board, CELL_SIZE);
     drawCheckpoints(context, state.board, CELL_SIZE);
     drawStartSlotLabels(context, state.board, CELL_SIZE);
@@ -97,8 +98,17 @@ export default function TestScenarioPage() {
   }, [displayState]);
 
   useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas]);
+    let frame = 0;
+    const loop = () => {
+      if (!paused) {
+        beltPhaseRef.current = (performance.now() % 2000) / 2000;
+      }
+      redrawCanvas();
+      frame = requestAnimationFrame(loop);
+    };
+    frame = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frame);
+  }, [redrawCanvas, paused]);
 
   if (!scenario) {
     return (

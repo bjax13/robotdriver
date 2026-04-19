@@ -3,17 +3,19 @@ import { createInitialState } from "../../engine/gameState.js";
 import { runBoardElementStep } from "../../engine/postRegisterBoard.js";
 
 /** @type {import('../scenarioTypes.js').EngineTestScenario} */
-export const conveyorExpressTwo = {
-  id: "conveyor-express-two",
-  title: "Express conveyor moves two cells",
+export const conveyorExpressTwoTiles = {
+  id: "conveyor-express-two-tiles",
+  title: "Two express belts in a row move two cells",
   module: "boardElements",
-  description: "A robot on an express belt moves two spaces in the belt direction during the conveyors step.",
+  description:
+    "Two consecutive express tiles in the same direction chain: one step per belt tile during the conveyors step.",
   parityIds: ["PC-BEL-001"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
   buildState: () => {
     const board = createBoard(10, 6);
     board.conveyors = {
       "1,1": { direction: 90, express: true },
+      "2,1": { direction: 90, express: true },
     };
     return createInitialState({
       board,

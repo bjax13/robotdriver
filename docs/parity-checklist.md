@@ -39,7 +39,7 @@ Modules mirror [`src/engine/`](../src/engine/). Expand rows beyond the single ex
 
 | ID | Rule / behavior | Status | Evidence |
 |----|-------------------|--------|----------|
-| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/conveyor-express-two`, `http://localhost:3000/testing/conveyor-normal-one`, `http://localhost:3000/testing/gear-rotate-left`, `http://localhost:3000/testing/push-panel-register-gate` |
+| PC-BEL-001 | Conveyors / gears / push panels resolve in documented post-register order | draft | [`src/engine/__tests__/boardElements.test.js`](../src/engine/__tests__/boardElements.test.js) · visual: `http://localhost:3000/testing/conveyor-express-one-tile`, `http://localhost:3000/testing/conveyor-express-two-tiles`, `http://localhost:3000/testing/conveyor-normal-one`, `http://localhost:3000/testing/gear-rotate-left`, `http://localhost:3000/testing/push-panel-register-gate` |
 
 ---
 

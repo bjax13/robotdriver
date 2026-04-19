@@ -73,9 +73,33 @@ describe('board elements', () => {
     expect(state.robots[0].registers).toEqual([]);
   });
 
-  it('express conveyor moves two spaces along belt direction', () => {
+  it('single express conveyor tile moves one space (end of that belt)', () => {
     const board = createBoard(6, 5);
     board.conveyors = { '1,2': { direction: 90, express: true } };
+    let state = createInitialState({
+      board,
+      robots: [{ col: 1, row: 2 }],
+      antenna: { col: 0, row: 0 },
+    });
+    state = dealHands(state);
+    state = setProgram(state, 'r1', [
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+      CARD_TYPES.TURN_LEFT,
+    ]);
+    state = activateRound(state);
+    expect(state.robots[0].col).toBe(2);
+    expect(state.robots[0].row).toBe(2);
+  });
+
+  it('two consecutive express tiles chain to two spaces along belt direction', () => {
+    const board = createBoard(6, 5);
+    board.conveyors = {
+      '1,2': { direction: 90, express: true },
+      '2,2': { direction: 90, express: true },
+    };
     let state = createInitialState({
       board,
       robots: [{ col: 1, row: 2 }],

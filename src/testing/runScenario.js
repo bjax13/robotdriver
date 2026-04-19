@@ -6,7 +6,7 @@
 export function runScenario(scenario) {
   let state = scenario.buildState();
   /** @type { { label: string, state: import('../engine/types').GameState }[] } */
-  const trace = [{ label: "start", state }];
+  const trace = [{ label: scenario.initialTraceLabel ?? "start", state }];
   for (const step of scenario.steps) {
     state = step.apply(state);
     trace.push({ label: step.label, state });

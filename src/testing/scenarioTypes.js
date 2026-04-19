@@ -9,6 +9,7 @@
  * @property {string} description
  * @property {string[]} parityIds
  * @property {string} testEvidence - path to Jest file in repo, e.g. src/engine/__tests__/foo.test.js
+ * @property {string} [initialTraceLabel] - replaces default "start" for the first trace frame
  * @property {() => GameState} buildState
  * @property {ScenarioStep[]} steps
  * @property {(s: GameState) => { ok: boolean, reason?: string }} assert

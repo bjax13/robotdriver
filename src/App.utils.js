@@ -153,17 +153,45 @@ function drawBeltChevron(context, cx, cy, forward, perp, scale) {
 }
 
 /**
+ * Scrolling chevron strip (looping tread). `phase` in [0,1) shifts the pattern along the belt.
+ * @param {CanvasRenderingContext2D} context
+ * @param {number} cx
+ * @param {number} cy
+ * @param {{ ux: number, uy: number }} forward
+ * @param {{ ux: number, uy: number }} perp
+ * @param {number} scale
+ * @param {number} phase
+ */
+function drawBeltChevronStrip(context, cx, cy, forward, perp, scale, phase) {
+  const pitch = scale * 0.58;
+  const wrapped = ((phase % 1) + 1) % 1;
+  const offset = wrapped * pitch;
+  const span = scale * 2.8;
+  const kMin = Math.ceil(-span / pitch - 4);
+  const kMax = Math.floor(span / pitch + 4);
+  const chevScale = scale * 0.68;
+  for (let k = kMin; k <= kMax; k++) {
+    const along = k * pitch - offset;
+    const px = cx + forward.ux * along;
+    const py = cy + forward.uy * along;
+    drawBeltChevron(context, px, py, forward, perp, chevScale);
+  }
+}
+
+/**
  * Standard and express conveyor belts (engine: direction 0–270, express = 2 steps).
  * @param {CanvasRenderingContext2D} context
  * @param {{ width: number, height: number, conveyors?: Record<string, { direction: number, express?: boolean }> }} board
  * @param {number} cellSize
+ * @param {number} [beltPhase] - If set (0–1 loop), chevrons scroll along the arrow; omit for a static single chevron.
  */
-export function drawConveyors(context, board, cellSize) {
+export function drawConveyors(context, board, cellSize, beltPhase) {
   const conveyors = board.conveyors;
   if (!conveyors) return;
 
   const half = cellSize / 2;
   const baseScale = Math.max(8, cellSize * 0.22);
+  const animate = beltPhase !== undefined && beltPhase !== null;
 
   for (const [key, conv] of Object.entries(conveyors)) {
     const [col, row] = key.split(",").map(Number);
@@ -175,20 +203,55 @@ export function drawConveyors(context, board, cellSize) {
     const perp = { ux: -forward.uy, uy: forward.ux };
     const express = !!conv.express;
     const spacing = express ? baseScale * 0.45 : 0;
+    const inset = 2;
+    const cellLeft = col * cellSize + inset;
+    const cellTop = row * cellSize + inset;
+    const cellInner = cellSize - inset * 2;
 
     context.save();
     context.fillStyle = express ? "rgba(234, 179, 8, 0.45)" : "rgba(100, 116, 139, 0.35)";
     context.beginPath();
-    context.rect(
-      col * cellSize + 2,
-      row * cellSize + 2,
-      cellSize - 4,
-      cellSize - 4
-    );
+    context.rect(cellLeft, cellTop, cellInner, cellInner);
     context.fill();
 
     context.fillStyle = express ? "#a16207" : "#475569";
-    if (express) {
+    if (animate) {
+      const phase = /** @type {number} */ (beltPhase);
+      context.save();
+      context.beginPath();
+      context.rect(cellLeft, cellTop, cellInner, cellInner);
+      context.clip();
+      if (express) {
+        drawBeltChevronStrip(
+          context,
+          cx - perp.ux * spacing,
+          cy - perp.uy * spacing,
+          forward,
+          perp,
+          baseScale,
+          phase
+        );
+        drawBeltChevronStrip(
+          context,
+          cx + perp.ux * spacing,
+          cy + perp.uy * spacing,
+          forward,
+          perp,
+          baseScale,
+          phase
+        );
+      } else {
+        drawBeltChevronStrip(context, cx, cy, forward, perp, baseScale, phase);
+      }
+      context.restore();
+      if (express) {
+        context.fillStyle = "#92400e";
+        context.font = `bold ${Math.round(cellSize * 0.22)}px sans-serif`;
+        context.textAlign = "center";
+        context.textBaseline = "bottom";
+        context.fillText("2×", cx, row * cellSize + cellSize - 3);
+      }
+    } else if (express) {
       drawBeltChevron(
         context,
         cx - perp.ux * spacing,
