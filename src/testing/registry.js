@@ -11,6 +11,7 @@ import { conveyorExpressBeforeNormal } from "./scenarios/conveyorExpressBeforeNo
 import { conveyorBeltLoop } from "./scenarios/conveyorBeltLoop.js";
 import { conveyorBeltLoopNormal } from "./scenarios/conveyorBeltLoopNormal.js";
 import { conveyorBeltMergeT } from "./scenarios/conveyorBeltMergeT.js";
+import { conveyorExpressMergeTTwoBots } from "./scenarios/conveyorExpressMergeTTwoBots.js";
 import { conveyorThenPushPanel } from "./scenarios/conveyorThenPushPanel.js";
 import { conveyorNormalOne } from "./scenarios/conveyorNormalOne.js";
 import { gearRotateLeft } from "./scenarios/gearRotateLeft.js";
@@ -38,6 +39,7 @@ export const testScenarios = [
   conveyorBeltLoop,
   conveyorBeltLoopNormal,
   conveyorBeltMergeT,
+  conveyorExpressMergeTTwoBots,
   conveyorThenPushPanel,
   conveyorNormalOne,
   gearRotateLeft,

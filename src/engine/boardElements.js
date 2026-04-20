@@ -115,13 +115,63 @@ export function advanceExpressBeltsTwoSteps(state) {
 }
 
 /**
+ * Simulate sliding along express tiles; updates a clone of occupancy so this robot can
+ * traverse its own path while other robots stay at phase-start positions.
+ * @param {import('./types').GameState['board']} board
+ * @param {Map<string, string>} occ
+ * @param {string} robotId
+ * @param {number} startCol
+ * @param {number} startRow
+ * @param {number} maxSteps
+ */
+function simulateExpressChain(board, occ, robotId, startCol, startRow, maxSteps) {
+  let c = startCol;
+  let r = startRow;
+  let moved = 0;
+  const startKey = `${startCol},${startRow}`;
+  if (occ.get(startKey) !== robotId) {
+    return { endCol: startCol, endRow: startRow, moved: 0 };
+  }
+
+  while (moved < maxSteps) {
+    const hereKey = `${c},${r}`;
+    const convHere = board.conveyors?.[hereKey];
+    if (!convHere?.express) break;
+
+    const direction = convHere.direction;
+    if (hasWall(board, c, r, direction)) break;
+    const { dCol, dRow } = directionDelta(direction);
+    const nextC = c + dCol;
+    const nextR = r + dRow;
+    if (!inBounds(board, nextC, nextR)) break;
+    const nextKey = `${nextC},${nextR}`;
+    const blocking = occ.get(nextKey);
+    if (blocking && blocking !== robotId) break;
+
+    occ.delete(`${c},${r}`);
+    c = nextC;
+    r = nextR;
+    occ.set(`${c},${r}`, robotId);
+    moved++;
+  }
+
+  return { endCol: c, endRow: r, moved };
+}
+
+/**
  * Resolve conveyors: express first, then normal.
  * Express: move along consecutive express tiles (same phase), one grid step per tile,
  * following each tile's direction until leaving the express belt chain (Robo Rally style).
  * Normal: one step along that belt's direction (existing single-step behavior).
  * Conveyor into occupied cell: stop.
+ *
+ * **Same-priority destination ties:** if two or more robots (all express in the express
+ * phase, or all normal in the normal phase) would finish the phase on the same grid cell,
+ * none of those moves occur — each stays on its belt (Robo Rally merge rule).
+ * Express still runs before normal; a robot placed by express can block or be blocked in
+ * the normal phase using post-express occupancy.
  * @param {import('./types').GameState} state
- * @param {Map<string, string>} cellToRobotId - "col,row" -> robotId
+ * @param {Map<string, string>} cellToRobotId - "col,row" -> robotId (updated to match result)
  * @returns {{ updates: Map<string, { col: number, row: number }> }}
  */
 export function resolveConveyors(state, cellToRobotId) {
@@ -129,87 +179,165 @@ export function resolveConveyors(state, cellToRobotId) {
   if (!board.conveyors) return { updates: new Map() };
 
   const updates = new Map();
-  const express = [];
-  const normal = [];
 
   const maxExpressSteps = Object.values(board.conveyors).filter((c) => c.express).length;
 
+  /** @type {{ col: number, row: number, robotId: string }[]} */
+  const expressStarters = [];
   for (const [key, conv] of Object.entries(board.conveyors)) {
     const [col, row] = key.split(',').map(Number);
     const robotId = cellToRobotId.get(key);
-    if (!robotId) continue;
-    if (conv.express) express.push({ col, row, robotId, ...conv });
-    else normal.push({ col, row, robotId, ...conv });
+    if (!robotId || !conv.express) continue;
+    expressStarters.push({ col, row, robotId });
   }
 
-  for (const { col: startCol, row: startRow, robotId } of express) {
-    const startKey = `${startCol},${startRow}`;
-    if (cellToRobotId.get(startKey) !== robotId) continue;
+  const initialOcc = new Map(cellToRobotId);
 
-    let c = startCol;
-    let r = startRow;
-    let moved = 0;
+  /** @type {{ robotId: string, startCol: number, startRow: number, endCol: number, endRow: number, moved: number }[]} */
+  const expressPlans = [];
+  for (const { col: startCol, row: startRow, robotId } of expressStarters) {
+    const occ = new Map(initialOcc);
+    const { endCol, endRow, moved } = simulateExpressChain(
+      board,
+      occ,
+      robotId,
+      startCol,
+      startRow,
+      maxExpressSteps
+    );
+    expressPlans.push({ robotId, startCol, startRow, endCol, endRow, moved });
+  }
 
-    while (moved < maxExpressSteps) {
-      const hereKey = `${c},${r}`;
-      const convHere = board.conveyors?.[hereKey];
-      if (!convHere?.express) break;
+  /** @type {Map<string, string[]>} */
+  const expressDestRobots = new Map();
+  for (const p of expressPlans) {
+    if (p.moved <= 0) continue;
+    const dk = `${p.endCol},${p.endRow}`;
+    const list = expressDestRobots.get(dk) ?? [];
+    list.push(p.robotId);
+    expressDestRobots.set(dk, list);
+  }
 
-      const direction = convHere.direction;
-      if (hasWall(board, c, r, direction)) break;
-      const { dCol, dRow } = directionDelta(direction);
-      const nextC = c + dCol;
-      const nextR = r + dRow;
-      if (!inBounds(board, nextC, nextR)) break;
-      const nextKey = `${nextC},${nextR}`;
-      const blocking = cellToRobotId.get(nextKey);
-      if (blocking && blocking !== robotId) break;
-
-      cellToRobotId.delete(`${c},${r}`);
-      c = nextC;
-      r = nextR;
-      cellToRobotId.set(`${c},${r}`, robotId);
-      moved++;
+  const expressCancelled = new Set();
+  for (const [, ids] of expressDestRobots) {
+    if (ids.length > 1) {
+      for (const id of ids) expressCancelled.add(id);
     }
+  }
 
-    const beltFacing = board.conveyors?.[`${c},${r}`]?.direction;
+  /** post-express occupancy */
+  const afterExpress = new Map(initialOcc);
+  for (const p of expressPlans) {
+    if (p.moved <= 0) continue;
+    if (expressCancelled.has(p.robotId)) continue;
+    afterExpress.delete(`${p.startCol},${p.startRow}`);
+    afterExpress.set(`${p.endCol},${p.endRow}`, p.robotId);
+  }
+
+  /** @type {Map<string, Record<string, number>>} */
+  const expressPatches = new Map();
+  for (const p of expressPlans) {
+    const startBeltDir = board.conveyors[`${p.startCol},${p.startRow}`]?.direction;
+    const endBeltDir = board.conveyors[`${p.endCol},${p.endRow}`]?.direction;
     const patch = {};
-    if (moved > 0) {
-      patch.col = c;
-      patch.row = r;
+    if (p.moved > 0 && !expressCancelled.has(p.robotId)) {
+      patch.col = p.endCol;
+      patch.row = p.endRow;
+      if (endBeltDir !== undefined) patch.direction = endBeltDir;
+    } else {
+      patch.col = p.startCol;
+      patch.row = p.startRow;
+      if (startBeltDir !== undefined) patch.direction = startBeltDir;
     }
-    if (beltFacing !== undefined) patch.direction = beltFacing;
-    if (Object.keys(patch).length > 0) updates.set(robotId, patch);
+    expressPatches.set(p.robotId, patch);
   }
 
-  for (const { col, row, robotId, direction } of normal) {
-    const { dCol, dRow } = directionDelta(direction);
+  /** Normal belts: robots currently on a normal conveyor tile after express phase. */
+  /** @type {{ col: number, row: number, robotId: string, direction: number }[]} */
+  const normals = [];
+  for (const [key, conv] of Object.entries(board.conveyors)) {
+    if (conv.express) continue;
+    const robotId = afterExpress.get(key);
+    if (!robotId) continue;
+    const [col, row] = key.split(',').map(Number);
+    normals.push({ col, row, robotId, direction: conv.direction });
+  }
+
+  /** @type {{ robotId: string, startCol: number, startRow: number, endCol: number, endRow: number, moved: number }[]} */
+  const normalPlans = [];
+  for (const { col, row, robotId, direction } of normals) {
+    const occ = new Map(afterExpress);
+    const startKey = `${col},${row}`;
+    if (occ.get(startKey) !== robotId) continue;
+
+    let moved = 0;
     let c = col;
     let r = row;
-    let moved = 0;
-    const steps = 1;
-    for (let s = 0; s < steps; s++) {
-      if (hasWall(board, c, r, direction)) break;
+    const { dCol, dRow } = directionDelta(direction);
+    if (!hasWall(board, c, r, direction)) {
       const nextC = c + dCol;
       const nextR = r + dRow;
-      if (!inBounds(board, nextC, nextR)) break;
-      const nextKey = `${nextC},${nextR}`;
-      if (cellToRobotId.get(nextKey)) break;
-      c = nextC;
-      r = nextR;
-      moved++;
+      if (inBounds(board, nextC, nextR)) {
+        const nextKey = `${nextC},${nextR}`;
+        if (!occ.get(nextKey)) {
+          occ.delete(`${c},${r}`);
+          c = nextC;
+          r = nextR;
+          occ.set(nextKey, robotId);
+          moved = 1;
+        }
+      }
     }
-    const beltFacing = board.conveyors?.[`${c},${r}`]?.direction;
-    const patch = {};
-    if (moved > 0) {
-      patch.col = c;
-      patch.row = r;
-      cellToRobotId.delete(`${col},${row}`);
-      cellToRobotId.set(`${c},${r}`, robotId);
-    }
-    if (beltFacing !== undefined) patch.direction = beltFacing;
-    if (Object.keys(patch).length > 0) updates.set(robotId, patch);
+    normalPlans.push({ robotId, startCol: col, startRow: row, endCol: c, endRow: r, moved });
   }
+
+  /** @type {Map<string, string[]>} */
+  const normalDestRobots = new Map();
+  for (const p of normalPlans) {
+    if (p.moved <= 0) continue;
+    const dk = `${p.endCol},${p.endRow}`;
+    const list = normalDestRobots.get(dk) ?? [];
+    list.push(p.robotId);
+    normalDestRobots.set(dk, list);
+  }
+
+  const normalCancelled = new Set();
+  for (const [, ids] of normalDestRobots) {
+    if (ids.length > 1) {
+      for (const id of ids) normalCancelled.add(id);
+    }
+  }
+
+  for (const p of normalPlans) {
+    const startBeltDir = board.conveyors[`${p.startCol},${p.startRow}`]?.direction;
+    const endBeltDir = board.conveyors[`${p.endCol},${p.endRow}`]?.direction;
+    const patch = {};
+    if (p.moved > 0 && !normalCancelled.has(p.robotId)) {
+      patch.col = p.endCol;
+      patch.row = p.endRow;
+      if (endBeltDir !== undefined) patch.direction = endBeltDir;
+    } else {
+      patch.col = p.startCol;
+      patch.row = p.startRow;
+      if (startBeltDir !== undefined) patch.direction = startBeltDir;
+    }
+    updates.set(p.robotId, patch);
+  }
+
+  // Robots that did not get a normal-belt patch still use express-only resolution
+  for (const [robotId, patch] of expressPatches) {
+    if (!updates.has(robotId)) updates.set(robotId, patch);
+  }
+
+  // Keep caller's cell map in sync with final positions
+  cellToRobotId.clear();
+  for (const [k, v] of afterExpress) cellToRobotId.set(k, v);
+  for (const p of normalPlans) {
+    if (p.moved <= 0 || normalCancelled.has(p.robotId)) continue;
+    cellToRobotId.delete(`${p.startCol},${p.startRow}`);
+    cellToRobotId.set(`${p.endCol},${p.endRow}`, p.robotId);
+  }
+
   return { updates };
 }
 

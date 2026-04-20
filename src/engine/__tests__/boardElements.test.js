@@ -190,7 +190,7 @@ describe('board elements', () => {
     expect(state.robots[1].row).toBe(2);
   });
 
-  it('two express starters: iteration order decides who captures the merge tile first', () => {
+  it('two express starters: downstream tile occupied in snapshot blocks the trailing belt first step', () => {
     const board = createBoard(8, 5);
     board.conveyors = {
       '2,2': { direction: 90, express: true },
@@ -221,7 +221,8 @@ describe('board elements', () => {
     ]);
     state = activateRegister(state, 0);
     expect(state.robots.find((r) => r.id === 'r1')?.col).toBe(3);
-    expect(state.robots.find((r) => r.id === 'r2')?.col).toBe(2);
+    // r2 cannot enter (2,2) while r1 still occupies it in the simultaneous snapshot
+    expect(state.robots.find((r) => r.id === 'r2')?.col).toBe(1);
   });
 
   it('three consecutive express tiles chain three spaces along belt direction', () => {
@@ -249,7 +250,7 @@ describe('board elements', () => {
     expect(state.robots[0].row).toBe(2);
   });
 
-  it('express merge: first resolved robot claims the tile; second express toward same cell stops', () => {
+  it('express merge: same-priority opposing express into one cell — both remain (destination tie)', () => {
     const board = createBoard(6, 5);
     board.conveyors = {
       '2,2': { direction: 90, express: true },
@@ -279,7 +280,7 @@ describe('board elements', () => {
       CARD_TYPES.TURN_LEFT,
     ]);
     state = activateRegister(state, 0);
-    expect(state.robots[0].col).toBe(3);
+    expect(state.robots[0].col).toBe(2);
     expect(state.robots[0].row).toBe(2);
     expect(state.robots[1].col).toBe(4);
     expect(state.robots[1].row).toBe(2);
@@ -564,10 +565,9 @@ describe('board elements', () => {
     });
 
     /**
-     * Merge conflict: two express belts feed one cell. Implementation resolves express robots in
-     * `Object.entries(board.conveyors)` insertion order; first mover claims the merge tile.
+     * Same-priority express: both simulate onto the same final cell → neither moves (merge tie).
      */
-    it('two express robots racing into one merge tile: earlier conveyor entry wins (r1 before r2)', () => {
+    it('two express robots racing into one merge tile: both stay (same-phase destination tie)', () => {
       const board = createBoard(8, 8);
       board.conveyors = {
         '1,2': { direction: 90, express: true },
@@ -586,12 +586,11 @@ describe('board elements', () => {
         ['2,3', 'r2'],
       ]);
       const { updates } = resolveConveyors(state, cellToRobotId);
-      expect(updates.get('r1')).toEqual({ col: 2, row: 2 });
-      // r2 does not move but still realigns to the belt on (2,3)
-      expect(updates.get('r2')).toEqual({ direction: 0 });
+      expect(updates.get('r1')).toEqual({ col: 1, row: 2, direction: 90 });
+      expect(updates.get('r2')).toEqual({ col: 2, row: 3, direction: 0 });
     });
 
-    it('same merge conflict with conveyor map order swapped: second-listed belt reaches merge first', () => {
+    it('same merge tie is order-independent (conveyor map key order)', () => {
       const board = createBoard(8, 8);
       board.conveyors = {
         '2,3': { direction: 0, express: true },
@@ -610,8 +609,32 @@ describe('board elements', () => {
         ['2,3', 'r2'],
       ]);
       const { updates } = resolveConveyors(state, cellToRobotId);
-      expect(updates.get('r2')).toEqual({ col: 2, row: 2 });
-      expect(updates.get('r1')).toEqual({ direction: 90 });
+      expect(updates.get('r1')).toEqual({ col: 1, row: 2, direction: 90 });
+      expect(updates.get('r2')).toEqual({ col: 2, row: 3, direction: 0 });
+    });
+
+    it('same-priority normal belts into one cell: both stay', () => {
+      const board = createBoard(6, 5);
+      board.conveyors = {
+        '1,2': { direction: 90, express: false },
+        '2,2': { direction: 180, express: false },
+        '2,1': { direction: 180, express: false },
+      };
+      const state = createInitialState({
+        board,
+        robots: [
+          { col: 1, row: 2 },
+          { col: 2, row: 1 },
+        ],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([
+        ['1,2', 'r1'],
+        ['2,1', 'r2'],
+      ]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toEqual({ col: 1, row: 2, direction: 90 });
+      expect(updates.get('r2')).toEqual({ col: 2, row: 1, direction: 180 });
     });
 
     /**
@@ -731,7 +754,7 @@ describe('board elements', () => {
     const cellToRobotId = new Map([['2,2', 'r1']]);
     const { updates } = resolveConveyors(state, cellToRobotId);
     // Blocked by wall: no move, but robot still faces the belt arrow
-    expect(updates.get('r1')).toEqual({ direction: 90 });
+    expect(updates.get('r1')).toEqual({ col: 2, row: 2, direction: 90 });
   });
 
   it('checkpoint advances and winner is set', () => {

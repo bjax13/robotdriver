@@ -84,13 +84,23 @@ To add a new trace: build the board + program in a test, capture `normalizeActiv
 
 ## Reference example (conveyors — express vs normal, merge contention)
 
-**Resolve order:** express belts run first (multi-step along express chains), then normal belts one step each ([`resolveConveyors`](../engine/boardElements.js)). When two express starters compete for the same downstream tile, iteration order over `board.conveyors` keys decides who moves first (documented in tests, not the physical rulebook).
+**Resolve order:** express belts run first (multi-step along express chains with **simultaneous** destination resolution), then normal belts one step each ([`resolveConveyors`](../engine/boardElements.js)).
+
+**Merge / collision matrix**
+
+| Situation | Outcome |
+|-----------|---------|
+| Same phase **and** same belt priority (all express or all normal), **same destination cell** after simulating each robot’s belt move | **None** of those robots move; each stays on its belt tile (destination tie). |
+| Express then normal in one conveyors step | Express moves complete first (occupancy updated). Normal belts then run; an express robot already in a cell blocks a normal belt entry. |
+| Destination occupied before the phase (another robot standing there) | Belt entry blocked by existing occupancy rules during simulation. |
+
+Sliding simulation uses phase-start occupancy for **other** robots but lets each robot traverse its own chain on a per-robot occupancy copy so multi-tile express paths are consistent.
 
 For stepped gallery helpers, `advanceExpressBeltsOneStep` / `advanceExpressBeltsTwoSteps` keep robot heading on straight runs and only apply heading changes at corner transitions.
 
 | Piece | Location |
 |-------|-----------|
-| Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `two express starters: iteration order decides merge tile`) |
+| Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `same-priority normal belts into one cell`; `two express robots racing into one merge tile`) |
 | Parity | `PC-BEL-001` in [`docs/parity-checklist.md`](../../docs/parity-checklist.md) |
 | Gallery URLs | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(express before normal)* |
 

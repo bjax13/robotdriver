@@ -8,7 +8,7 @@ export const conveyorExpressMergeRace = {
   title: "Two express belts race into one tile (merge contention)",
   module: "boardElements",
   description:
-    "Both robots are on express belts that would enter the same cell from east and west. This engine resolves express robots in `Object.entries(board.conveyors)` insertion order — here `2,2` is listed before `4,2`, so r1 reaches the merge first; r2 stays on the right. (Rulebook tie-break may differ; the gallery locks in current behavior for regression.)",
+    "Both robots are on express belts whose chains end on the same grid cell this phase (center column). Same-priority express → destination tie: neither moves; both stay on their belts. See also conveyor-express-before-normal when express and normal priorities differ.",
   parityIds: ["PC-BEL-001"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
   initialTraceLabel:
@@ -31,7 +31,7 @@ export const conveyorExpressMergeRace = {
   steps: [
     {
       label:
-        "Conveyors — first-listed belt captures merge tile; opposing express stops short",
+        "Conveyors — same-phase destination tie; both robots stay put",
       apply: (s) => runBoardElementStep(s, 0, "conveyors").state,
     },
   ],
@@ -41,7 +41,7 @@ export const conveyorExpressMergeRace = {
     const ok =
       r1 &&
       r2 &&
-      r1.col === 3 &&
+      r1.col === 2 &&
       r1.row === 2 &&
       r2.col === 4 &&
       r2.row === 2;
@@ -49,7 +49,7 @@ export const conveyorExpressMergeRace = {
       ? { ok: true }
       : {
           ok: false,
-          reason: `expected r1 at (3,2) and r2 at (4,2); got r1 (${r1?.col},${r1?.row}) r2 (${r2?.col},${r2?.row})`,
+          reason: `expected tie: r1 (2,2) r2 (4,2); got r1 (${r1?.col},${r1?.row}) r2 (${r2?.col},${r2?.row})`,
         };
   },
 };
