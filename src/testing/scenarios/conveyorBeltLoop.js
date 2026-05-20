@@ -42,7 +42,7 @@ export const conveyorBeltLoop = {
   title: "Express belt loop — 4×4 inner square (four tiles per side)",
   module: "boardElements",
   description:
-    "Sixteen **express** belts (yellow tile, double chevrons, “2×”) wrap a 4×4 empty interior. Each gallery step calls advanceExpressBeltsTwoSteps so the robot moves **two grid cells** per click—matching express belts carrying you two squares along the chain before normal belts move. (Single-tile stepping for debugging is advanceExpressBeltsOneStep.) A full register conveyors phase uses resolveConveyors and follows the **entire** express run in one resolution. Compare with conveyor-belt-loop-normal (gray belts, one cell per step).",
+    "Sixteen **express** belts (yellow tile, double chevrons, “2×”) wrap a 4×4 empty interior. **Gallery:** each step calls advanceExpressBeltsTwoSteps (two express grid moves per click, matching the 2× visualization); advanceExpressBeltsOneStep is single-tile debug stepping. **Register conveyors phase:** resolveConveyors repeats movement waves until nothing moves — wave 1 moves express one tile then normal one tile; wave 2+ moves all belt types one tile together with simultaneous destination ties. One conveyors phase can traverse the full ring in those waves (not one gallery click). Stepped helpers preserve heading on straight runs; resolveConveyors may align heading to the final belt arrow (see boardElements Jest). Compare conveyor-belt-loop-normal (gray belts, one cell per wave on normal-only chains).",
   parityIds: ["PC-BEL-001"],
   testEvidence: "src/engine/__tests__/boardElements.test.js",
   initialTraceLabel:
