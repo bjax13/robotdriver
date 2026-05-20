@@ -9,6 +9,7 @@ import { conveyorExpressLChain } from "./scenarios/conveyorExpressLChain.js";
 import { conveyorExpressMergeRace } from "./scenarios/conveyorExpressMergeRace.js";
 import { conveyorExpressBeforeNormal } from "./scenarios/conveyorExpressBeforeNormal.js";
 import { conveyorExpressNormalMergeSecondTile } from "./scenarios/conveyorExpressNormalMergeSecondTile.js";
+import { conveyorExpressToNormalHandoff } from "./scenarios/conveyorExpressToNormalHandoff.js";
 import { conveyorBeltLoop } from "./scenarios/conveyorBeltLoop.js";
 import { conveyorBeltLoopNormal } from "./scenarios/conveyorBeltLoopNormal.js";
 import { conveyorBeltMergeT } from "./scenarios/conveyorBeltMergeT.js";
@@ -38,6 +39,7 @@ export const testScenarios = [
   conveyorExpressMergeRace,
   conveyorExpressBeforeNormal,
   conveyorExpressNormalMergeSecondTile,
+  conveyorExpressToNormalHandoff,
   conveyorBeltLoop,
   conveyorBeltLoopNormal,
   conveyorBeltMergeT,
