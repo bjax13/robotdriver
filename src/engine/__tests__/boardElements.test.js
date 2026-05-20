@@ -736,6 +736,47 @@ describe('board elements', () => {
       const { updates } = resolveConveyors(state, cellToRobotId);
       expect(updates.get('r1')).toMatchObject({ col: 4, row: 2, direction: 90 });
     });
+
+    it('warns when maxWaves truncates with pending conveyor motion', () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const board = createBoard(8, 4);
+      board.conveyors = {
+        '0,2': { direction: 90, express: true },
+        '1,2': { direction: 90, express: true },
+        '2,2': { direction: 90, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 0, row: 2 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['0,2', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId, { maxWaves: 1 });
+      expect(updates.get('r1')).toMatchObject({ col: 1, row: 2, direction: 90 });
+      expect(warn).toHaveBeenCalledWith(
+        'resolveConveyors: hit maxWaves (1) with pending motion; results may be truncated'
+      );
+      warn.mockRestore();
+    });
+
+    it('does not warn when default maxWaves completes a multi-tile express chain', () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const board = createBoard(8, 4);
+      board.conveyors = {
+        '0,2': { direction: 90, express: true },
+        '1,2': { direction: 90, express: true },
+        '2,2': { direction: 90, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 0, row: 2 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['0,2', 'r1']]);
+      resolveConveyors(state, cellToRobotId);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
   });
 
   it('conveyor moves robot', () => {

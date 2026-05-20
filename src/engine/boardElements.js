@@ -228,14 +228,16 @@ function grantBeltBudgetOnTypeChange(
  *
  * @param {import('./types').GameState} state
  * @param {Map<string, string>} cellToRobotId - "col,row" -> robotId (updated to match result)
+ * @param {{ maxWaves?: number }} [options] - optional wave cap (tests only; default is generous)
  * @returns {{ updates: Map<string, { col: number, row: number }> }}
  */
-export function resolveConveyors(state, cellToRobotId) {
+export function resolveConveyors(state, cellToRobotId, options) {
   const board = state.board;
   if (!board.conveyors) return { updates: new Map() };
 
-  const maxWaves =
+  let maxWaves =
     4 + Object.keys(board.conveyors).length + state.robots.filter((r) => !r.rebooted).length;
+  if (options?.maxWaves != null) maxWaves = options.maxWaves;
 
   /** @type {Map<string, { col: number, row: number, direction: number }>} */
   const pos = new Map();
@@ -441,7 +443,8 @@ export function resolveConveyors(state, cellToRobotId) {
     }
   }
 
-  if (process.env.NODE_ENV !== 'production' && wave >= maxWaves && movedInCycle) {
+  const truncated = wave >= maxWaves && movedInCycle;
+  if (process.env.NODE_ENV !== 'production' && truncated) {
     // eslint-disable-next-line no-console
     console.warn(
       `resolveConveyors: hit maxWaves (${maxWaves}) with pending motion; results may be truncated`
