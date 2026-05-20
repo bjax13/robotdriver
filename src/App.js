@@ -637,6 +637,7 @@ function GameView() {
       goNextRef.current();
     }, Math.max(200, autoStepMs));
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- interval gates on completedCount only; full activationSession would reset the timer whenever the session object is replaced each activation tick
   }, [
     autoStep,
     autoStepMs,
