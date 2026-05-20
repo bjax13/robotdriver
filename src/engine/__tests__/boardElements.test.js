@@ -700,6 +700,42 @@ describe('board elements', () => {
       expect(updates.get('r1')).toMatchObject({ col: 1, row: 2 });
       expect(updates.get('r2')).toMatchObject({ col: 2, row: 1, direction: 180 });
     });
+
+    it('express chain onto normal belt continues on normal tiles this register', () => {
+      const board = createBoard(8, 8);
+      board.conveyors = {
+        '0,2': { direction: 90, express: true },
+        '1,2': { direction: 90, express: true },
+        '2,2': { direction: 180, express: false },
+        '2,3': { direction: 180, express: false },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 0, row: 2 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['0,2', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toMatchObject({ col: 2, row: 4, direction: 180 });
+    });
+
+    it('normal belt onto express chain continues on express tiles this register', () => {
+      const board = createBoard(8, 8);
+      board.conveyors = {
+        '0,2': { direction: 90, express: false },
+        '1,2': { direction: 90, express: true },
+        '2,2': { direction: 90, express: true },
+        '3,2': { direction: 90, express: true },
+      };
+      const state = createInitialState({
+        board,
+        robots: [{ col: 0, row: 2 }],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([['0,2', 'r1']]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toMatchObject({ col: 4, row: 2, direction: 90 });
+    });
   });
 
   it('conveyor moves robot', () => {
