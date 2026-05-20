@@ -182,6 +182,35 @@ function tryNormalOneStepFromOcc(board, occ, robot) {
 }
 
 /**
+ * After a belt move, grant step budget when the robot lands on a belt type it was not
+ * already on (express vs normal). Does not refill budget mid-run on the same belt type.
+ */
+function grantBeltBudgetOnTypeChange(
+  board,
+  expressRemaining,
+  normalRemaining,
+  id,
+  fromCol,
+  fromRow,
+  toCol,
+  toRow,
+  maxExpressTileCount,
+  maxNormalTileCount
+) {
+  const from = board.conveyors?.[`${fromCol},${fromRow}`];
+  const to = board.conveyors?.[`${toCol},${toRow}`];
+  if (!to) return;
+  const fromExpress = Boolean(from?.express);
+  const fromNormal = Boolean(from && !from.express);
+  if (to.express && !fromExpress && (expressRemaining.get(id) ?? 0) <= 0) {
+    expressRemaining.set(id, maxExpressTileCount);
+  }
+  if (!to.express && !fromNormal && (normalRemaining.get(id) ?? 0) <= 0) {
+    normalRemaining.set(id, maxNormalTileCount);
+  }
+}
+
+/**
  * Resolve conveyors using **movement waves** per register (Robo Rally–style timing):
  *
  * - **Wave 1:** (a) every robot on an **express** tile moves **one** belt space (ties among
@@ -193,8 +222,9 @@ function tryNormalOneStepFromOcc(board, occ, robot) {
  *
  * Waves repeat until no robot moves in a full cycle. Express and normal each have a per-register
  * step budget capped by the number of express vs normal conveyor tiles on the board (same spirit
- * as the legacy express chain cap). Conveyor into an occupied cell still blocks; heading follows
- * belt arrows at the resting tile when on a conveyor.
+ * as the legacy express chain cap). Crossing onto the other belt type mid-register grants that
+ * type’s budget if the robot had none left. Conveyor into an occupied cell still blocks; heading
+ * follows belt arrows at the resting tile when on a conveyor.
  *
  * @param {import('./types').GameState} state
  * @param {Map<string, string>} cellToRobotId - "col,row" -> robotId (updated to match result)
@@ -269,12 +299,26 @@ export function resolveConveyors(state, cellToRobotId) {
         if (expCancelled.has(pr.id)) continue;
         const p = pos.get(pr.id);
         if (!p) continue;
-        occ.delete(`${p.col},${p.row}`);
+        const fromCol = p.col;
+        const fromRow = p.row;
+        occ.delete(`${fromCol},${fromRow}`);
         occ.set(`${pr.nextC},${pr.nextR}`, pr.id);
         p.col = pr.nextC;
         p.row = pr.nextR;
         if (pr.direction !== undefined) p.direction = pr.direction;
         expressRemaining.set(pr.id, (expressRemaining.get(pr.id) ?? 0) - 1);
+        grantBeltBudgetOnTypeChange(
+          board,
+          expressRemaining,
+          normalRemaining,
+          pr.id,
+          fromCol,
+          fromRow,
+          pr.nextC,
+          pr.nextR,
+          maxExpressTileCount,
+          maxNormalTileCount
+        );
         movedInCycle = true;
       }
 
@@ -305,13 +349,27 @@ export function resolveConveyors(state, cellToRobotId) {
         if (normCancelled.has(pr.id)) continue;
         const p = pos.get(pr.id);
         if (!p) continue;
-        occ.delete(`${p.col},${p.row}`);
+        const fromCol = p.col;
+        const fromRow = p.row;
+        occ.delete(`${fromCol},${fromRow}`);
         occ.set(`${pr.nextC},${pr.nextR}`, pr.id);
         p.col = pr.nextC;
         p.row = pr.nextR;
         const beltDir = board.conveyors[`${pr.nextC},${pr.nextR}`]?.direction;
         if (beltDir !== undefined) p.direction = beltDir;
         normalRemaining.set(pr.id, (normalRemaining.get(pr.id) ?? 0) - 1);
+        grantBeltBudgetOnTypeChange(
+          board,
+          expressRemaining,
+          normalRemaining,
+          pr.id,
+          fromCol,
+          fromRow,
+          pr.nextC,
+          pr.nextR,
+          maxExpressTileCount,
+          maxNormalTileCount
+        );
         movedInCycle = true;
       }
     } else {
@@ -353,7 +411,9 @@ export function resolveConveyors(state, cellToRobotId) {
         if (cancelled.has(pr.id)) continue;
         const p = pos.get(pr.id);
         if (!p) continue;
-        occ.delete(`${p.col},${p.row}`);
+        const fromCol = p.col;
+        const fromRow = p.row;
+        occ.delete(`${fromCol},${fromRow}`);
         occ.set(`${pr.nextC},${pr.nextR}`, pr.id);
         p.col = pr.nextC;
         p.row = pr.nextR;
@@ -364,9 +424,28 @@ export function resolveConveyors(state, cellToRobotId) {
         }
         if (pr.kind === 'E') expressRemaining.set(pr.id, (expressRemaining.get(pr.id) ?? 0) - 1);
         else normalRemaining.set(pr.id, (normalRemaining.get(pr.id) ?? 0) - 1);
+        grantBeltBudgetOnTypeChange(
+          board,
+          expressRemaining,
+          normalRemaining,
+          pr.id,
+          fromCol,
+          fromRow,
+          pr.nextC,
+          pr.nextR,
+          maxExpressTileCount,
+          maxNormalTileCount
+        );
         movedInCycle = true;
       }
     }
+  }
+
+  if (process.env.NODE_ENV !== 'production' && wave >= maxWaves && movedInCycle) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `resolveConveyors: hit maxWaves (${maxWaves}) with pending motion; results may be truncated`
+    );
   }
 
   const updates = new Map();
