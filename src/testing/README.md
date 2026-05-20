@@ -92,6 +92,8 @@ To add a new trace: build the board + program in a test, capture `normalizeActiv
 |-----------|---------|
 | Same phase **and** same belt priority (all express or all normal), **same destination cell** after simulating each robot’s belt move | **None** of those robots move; each stays on its belt tile (destination tie). |
 | Express then normal in one conveyors step | Express moves complete first (occupancy updated). Normal belts then run; an express robot already in a cell blocks a normal belt entry. |
+| Express vs normal, **both** second belt movement targets the same merge cell | **Destination tie** (same priority in that wave): **neither** enters. Gallery: [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile). |
+| Express vs normal, **both one step** from merge (first movement wave) | Express runs first in wave 1, then normal — express can occupy the cell before normal moves. Gallery: [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal). |
 | Destination occupied before the phase (another robot standing there) | Belt entry blocked by existing occupancy rules during simulation. |
 
 Sliding simulation uses phase-start occupancy for **other** robots but lets each robot traverse its own chain on a per-robot occupancy copy so multi-tile express paths are consistent.
@@ -102,7 +104,7 @@ For stepped gallery helpers, `advanceExpressBeltsOneStep` / `advanceExpressBelts
 |-------|-----------|
 | Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `same-priority normal belts into one cell`; `two express robots racing into one merge tile`) |
 | Parity | `PC-BEL-001` in [`docs/parity-checklist.md`](../../docs/parity-checklist.md) |
-| Gallery URLs | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(express before normal)* |
+| Gallery URLs | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(express before normal)* · [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile) *(express vs normal T merge)* |
 
 ## Reference example (activation invariants — headless stress)
 

@@ -221,8 +221,8 @@ describe('board elements', () => {
     ]);
     state = activateRegister(state, 0);
     expect(state.robots.find((r) => r.id === 'r1')?.col).toBe(3);
-    // r2 cannot enter (2,2) while r1 still occupies it in the simultaneous snapshot
-    expect(state.robots.find((r) => r.id === 'r2')?.col).toBe(1);
+    // Wave 1 express: r2 blocked into (2,2) by r1. Wave 2: r1 has cleared (2,2); r2 can enter.
+    expect(state.robots.find((r) => r.id === 'r2')?.col).toBe(2);
   });
 
   it('three consecutive express tiles chain three spaces along belt direction', () => {
@@ -483,7 +483,7 @@ describe('board elements', () => {
       });
       const cellToRobotId = new Map([['1,3', 'r1']]);
       const { updates } = resolveConveyors(state, cellToRobotId);
-      expect(updates.get('r1')).toEqual({ col: 3, row: 4 });
+      expect(updates.get('r1')).toEqual({ col: 3, row: 4, direction: 0 });
     });
 
     it('express chain follows corners: three express tiles east then south lands two steps past the bend', () => {
@@ -535,7 +535,7 @@ describe('board elements', () => {
       });
       const cellToRobotId = new Map([['1,2', 'r1']]);
       const { updates } = resolveConveyors(state, cellToRobotId);
-      expect(updates.get('r1')).toEqual({ col: 8, row: 2 });
+      expect(updates.get('r1')).toEqual({ col: 8, row: 2, direction: 270 });
     });
 
     it('four consecutive straight express tiles move four cells in belt direction', () => {
@@ -674,6 +674,31 @@ describe('board elements', () => {
       const r2 = after.robots.find((r) => r.id === 'r2');
       expect(r1).toMatchObject({ col: 2, row: 2 });
       expect(r2).toMatchObject({ col: 3, row: 2 });
+    });
+
+    it('express vs normal: wave 2 simultaneous tie on merge cell — neither enters', () => {
+      const board = createBoard(8, 6);
+      board.conveyors = {
+        '0,2': { direction: 90, express: true },
+        '1,2': { direction: 90, express: true },
+        '2,0': { direction: 180, express: false },
+        '2,1': { direction: 180, express: false },
+      };
+      const state = createInitialState({
+        board,
+        robots: [
+          { col: 0, row: 2 },
+          { col: 2, row: 0 },
+        ],
+        antenna: { col: 0, row: 0 },
+      });
+      const cellToRobotId = new Map([
+        ['0,2', 'r1'],
+        ['2,0', 'r2'],
+      ]);
+      const { updates } = resolveConveyors(state, cellToRobotId);
+      expect(updates.get('r1')).toMatchObject({ col: 1, row: 2 });
+      expect(updates.get('r2')).toMatchObject({ col: 2, row: 1, direction: 180 });
     });
   });
 
