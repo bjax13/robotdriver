@@ -84,27 +84,33 @@ To add a new trace: build the board + program in a test, capture `normalizeActiv
 
 ## Reference example (conveyors — express vs normal, merge contention)
 
-**Resolve order:** express belts run first (multi-step along express chains with **simultaneous** destination resolution), then normal belts one step each ([`resolveConveyors`](../engine/boardElements.js)).
+**Movement waves** ([`resolveConveyors`](../engine/boardElements.js)) — repeated until a full cycle moves nothing:
+
+- **Wave 1:** (a) each robot on **express** moves one belt space — simultaneous destination ties cancel among express-only proposals; (b) each robot on **normal** moves one space — normal-only ties cancel. Occupancy updates between (a) and (b).
+- **Wave 2+:** each robot still on **any** belt moves one space; express and normal proposals resolve **together** — two or more claimants for the same cell cancel **all** moves onto it (same priority in that wave).
+
+Per-register step budgets cap how far each robot can travel on express vs normal tiles (see engine JSDoc). Crossing onto the other belt type mid-register can grant that type’s budget when exhausted.
 
 **Merge / collision matrix**
 
 | Situation | Outcome |
 |-----------|---------|
-| Same phase **and** same belt priority (all express or all normal), **same destination cell** after simulating each robot’s belt move | **None** of those robots move; each stays on its belt tile (destination tie). |
-| Express then normal in one conveyors step | Express moves complete first (occupancy updated). Normal belts then run; an express robot already in a cell blocks a normal belt entry. |
-| Express vs normal, **both** second belt movement targets the same merge cell | **Destination tie** (same priority in that wave): **neither** enters. Gallery: [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile). |
-| Express vs normal, **both one step** from merge (first movement wave) | Express runs first in wave 1, then normal — express can occupy the cell before normal moves. Gallery: [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal). |
+| Same sub-phase or wave, **same destination** (all express in wave‑1a, all normal in wave‑1b, or any mix in wave 2+) | **Destination tie:** none of the tied robots enter that cell; each stays on its belt tile. |
+| **Wave 1** — express sub-phase, then normal sub-phase | Express moves apply first (occupancy updated). Normal moves afterward; a cell already taken by express blocks normal entry. Gallery: [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal). |
+| **Wave 2+** — express vs normal, **both** targeting the same merge cell in the same wave | **Destination tie** (same priority): **neither** enters. Gallery: [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile). |
+| **Wave 1** — express vs normal, **both one step** from merge (not a wave‑2 tie) | Express sub-phase runs before normal — express can occupy the cell first. Not the same as wave‑2 simultaneous merge (see row above). |
+| Express chain onto normal belt (same register) | Multiple waves in one conveyors phase: express steps reach the handoff tile; later waves continue on normal tiles. Gallery: [`/testing/conveyor-express-to-normal-handoff`](http://localhost:3000/testing/conveyor-express-to-normal-handoff). |
 | Destination occupied before the phase (another robot standing there) | Belt entry blocked by existing occupancy rules during simulation. |
 
-Sliding simulation uses phase-start occupancy for **other** robots but lets each robot traverse its own chain on a per-robot occupancy copy so multi-tile express paths are consistent.
+Each wave uses phase-start occupancy for **other** robots when simulating proposals; multi-tile express chains stay consistent on a per-robot occupancy copy.
 
-For stepped gallery helpers, `advanceExpressBeltsOneStep` / `advanceExpressBeltsTwoSteps` keep robot heading on straight runs and only apply heading changes at corner transitions.
+**Gallery stepping** (`advanceExpressBeltsOneStep` / `advanceExpressBeltsTwoSteps`): express-only helpers for visualization — not the full wave model. They keep robot heading on straight runs and only turn at corner transitions; a register conveyors step still uses `resolveConveyors` (see [`/testing/conveyor-belt-loop`](http://localhost:3000/testing/conveyor-belt-loop) vs one-shot lap heading).
 
 | Piece | Location |
 |-------|-----------|
-| Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express belts resolve before normal belts`; `same-priority normal belts into one cell`; `two express robots racing into one merge tile`) |
+| Jest | [`../engine/__tests__/boardElements.test.js`](../engine/__tests__/boardElements.test.js) (`express phase runs before normal`; `express vs normal: wave 2 simultaneous tie`; `express chain onto normal belt`; `two express robots racing into one merge tile`) |
 | Parity | `PC-BEL-001` in [`docs/parity-checklist.md`](../../docs/parity-checklist.md) |
-| Gallery URLs | [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(express before normal)* · [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile) *(express vs normal T merge)* |
+| Gallery URLs | [`/testing/conveyor-belt-loop`](http://localhost:3000/testing/conveyor-belt-loop) *(express loop — stepped 2× vs register waves)* · [`/testing/conveyor-express-two-tiles`](http://localhost:3000/testing/conveyor-express-two-tiles) *(straight two-tile chain)* · [`/testing/conveyor-express-l-chain`](http://localhost:3000/testing/conveyor-express-l-chain) *(corner chain)* · [`/testing/conveyor-express-merge-race`](http://localhost:3000/testing/conveyor-express-merge-race) *(merge contention)* · [`/testing/conveyor-express-before-normal`](http://localhost:3000/testing/conveyor-express-before-normal) *(wave 1 express before normal)* · [`/testing/conveyor-express-normal-merge-second-tile`](http://localhost:3000/testing/conveyor-express-normal-merge-second-tile) *(wave 2+ express vs normal tie)* · [`/testing/conveyor-express-to-normal-handoff`](http://localhost:3000/testing/conveyor-express-to-normal-handoff) *(express→normal chain handoff)* |
 
 ## Reference example (activation invariants — headless stress)
 
